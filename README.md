@@ -1,31 +1,23 @@
 # Leuria
 
-**Bring your own AI to the web.** Leuria lets a website offer AI features that run on the visitor's own AI (their Claude Code today, more agents and local models next) instead of the site's API keys.
+**Bring your own AI to the web.** Leuria lets a website offer AI features that run on the visitor's own AI (ChatGPT, Claude, or a model on their computer) instead of the site's API keys.
 
 The site's code stays in the page: the visitor's agent can only call tools the page provides. It can't read files or run commands on the visitor's machine.
 
-> Status: **R0, walking skeleton.** Tested on macOS; Linux should work; Windows is untested. AIs: ACP agents (Codex with ChatGPT sign-in, Claude Code…), models in LM Studio and Ollama, and any OpenAI-compatible API.
+> Status: early. The desktop app is for Mac; on Windows and Linux, run the engine from a terminal. AIs: ChatGPT (through Codex), Claude Code and other ACP agents, models in LM Studio and Ollama, and any OpenAI-compatible API.
 
-## Use it (visitors)
+## Use it
 
-You need [Node.js 22+](https://nodejs.org) and [Claude Code](https://claude.com/claude-code), signed in (run `claude` once).
+Get the app from [leuria.eu](https://leuria.eu/download), or with Homebrew:
 
 ```sh
-npx @leuria/cli@latest
+brew tap leur-ia/leuria https://github.com/leur-ia/leuria
+brew install --cask leuria
 ```
 
-That's all. On first run Leuria installs its Claude adapter, checks your sign-in, and starts on `http://127.0.0.1:19570`. Keep the window open while you use Leuria sites.
+Choose your AI in the app. When a site offers **Connect your AI**, Leuria asks you in its own window, and you can disconnect any site there.
 
-When a site asks to connect, a Leuria window asks you to allow it. You can check and undo everything:
-
-| Command | What it does |
-| --- | --- |
-| `npx @leuria/cli doctor` | Checks Node, the adapter and your sign-in, with a fix for anything missing |
-| `npx @leuria/cli test` | Runs a real round trip with your agent: a page tool call, and a blocked built-in tool |
-| `npx @leuria/cli sites` | Lists the sites you connected |
-| `npx @leuria/cli sites revoke <origin>` | Disconnects a site and ends its sessions |
-
-State lives in `~/.leuria` (`config.json`, `grants.json`, `agents/`). More in [Getting started](docs/users/getting-started.md).
+Building a site? You can also run the engine from a terminal, without the app: see [Run Leuria from a terminal](docs/developers/cli.md).
 
 ## Add it to a site (developers)
 

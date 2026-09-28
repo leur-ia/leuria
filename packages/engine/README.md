@@ -11,4 +11,4 @@ npx @leuria/cli sites           # connected sites; `sites revoke <origin>` to di
 
 Needs Node.js 22+ and Claude Code, signed in (or `ANTHROPIC_API_KEY`). State lives in `~/.leuria`.
 
-Help for visitors: https://github.com/leur-ia/leuria/blob/main/docs/users/getting-started.md. The protocol, the browser SDK (`@leuria/client`) and security notes are in the same repository. Apache-2.0.
+For developers: run the engine without the app, to test a site, in CI, or on Windows and Linux. People who use Leuria install the app from https://leuria.eu. Guide: https://leuria.dev/docs/developers/cli. The protocol, the browser SDK (`@leuria/client`) and security notes are in the same repository. Apache-2.0.

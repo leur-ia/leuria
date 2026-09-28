@@ -35,9 +35,9 @@ const sidebars: SidebarsConfig = {
 				"developers/examples/routing",
 			],
 		},
+		"developers/cli",
 		"developers/protocol",
 		"security",
-		{ type: "category", label: "Use Leuria", items: ["users/getting-started"] },
 		{ type: "category", label: "Contribute", items: ["contributing/architecture", "contributing/development"] },
 	],
 };

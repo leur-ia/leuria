@@ -97,7 +97,7 @@ See [React](guides/react.md) for every hook.
 
 Your page already answers with the browser's built-in model where there is one (Chrome with its AI features on). To answer with your own AI:
 
-1. Run Leuria: the desktop app, or `npx @leuria/cli` in a terminal (Node.js 22+).
+1. Run Leuria: the [desktop app](https://leuria.eu/download), or `npx @leuria/cli` in a terminal ([Run Leuria from a terminal](cli.md)).
 2. Open your page and click **Connect your AI**.
 3. Allow your site in the window Leuria opens.
 

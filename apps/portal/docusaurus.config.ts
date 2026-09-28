@@ -122,7 +122,7 @@ const config: Config = {
 				},
 				{
 					title: "Use",
-					items: [{ label: "Getting started", to: "/docs/users/getting-started" }],
+					items: [{ label: "Get the Leuria app", href: "https://leuria.eu/download" }],
 				},
 				{
 					title: "Project",
