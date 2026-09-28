@@ -193,7 +193,7 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 					<Text size="1" color="gray">
 						You can disconnect it at any time in Leuria.
 					</Text>
-					<Flex gap="3" justify="end">
+					<Flex gap="3" justify="end" align="center">
 						<Button variant="ghost" color="gray" size="3" disabled={busy} onClick={() => decide(false)}>
 							Not now
 						</Button>
