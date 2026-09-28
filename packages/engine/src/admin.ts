@@ -39,7 +39,7 @@ import { type Candidate, fitOf, reasonFor, recommend, traitsOf, type Verdict } f
 import { parseNeeds, type SiteNeeds } from "./needs.js";
 import { detectInstalledClis } from "./detect.js";
 import type { GrantStore } from "./grants.js";
-import { addAi, removeAi, yourAis } from "./ais.js";
+import { addAi, providerInUse, removeAi, yourAis } from "./ais.js";
 import { type EmbedChoice, type EngineConfig, isKnownReady, loadConfig, saveConfig } from "./home.js";
 import { listLocalEmbedders, localEmbeddings } from "./llm/embeddings.js";
 import { parseBody, sendJson } from "./http-utils.js";
@@ -63,6 +63,7 @@ export interface AdminContext {
 export function createAdminHandler(ctx: AdminContext) {
 	// The sign-in in progress, if any: the visitor may cancel it.
 	let signingIn: AbortController | null = null;
+	let signingInAgent = "";
 	return async (
 		req: http.IncomingMessage,
 		res: http.ServerResponse,
@@ -238,8 +239,24 @@ export function createAdminHandler(ctx: AdminContext) {
 				return true;
 			}
 			removeAi(id);
-			// Its sites go back to the default.
-			for (const grant of ctx.grants.list()) if (grant.agent === id) ctx.grants.setAgent(grant.origin, undefined);
+			// Its sites go back to the default, with the default's model.
+			for (const grant of ctx.grants.list()) {
+				if (grant.agent === id) ctx.grants.setAgent(grant.origin, undefined);
+				if (grant.model?.agent === id) ctx.grants.setModel(grant.origin, undefined);
+			}
+			if (isLlmId(id)) {
+				// The service's address and key go too, unless something else still uses it.
+				const provider = parseLlmId(id)?.providerId;
+				if (provider && !providerInUse(provider, ctx.config.agent)) removeProvider(provider);
+			} else {
+				// A sign-in still waiting would hold the files being erased.
+				if (signingInAgent === id) {
+					signingIn?.abort();
+					signingIn = null;
+				}
+				// Its install and the sign-in Leuria keeps for it (never the visitor's own app's sign-in).
+				resetAgent(id);
+			}
 			sendJson(res, 200, { removed: id });
 			return true;
 		}
@@ -258,7 +275,8 @@ export function createAdminHandler(ctx: AdminContext) {
 			signingIn?.abort();
 			const controller = new AbortController();
 			signingIn = controller;
-			const result = await signIn(typeof body.agent === "string" && body.agent ? body.agent : ctx.config.agent, {
+			signingInAgent = typeof body.agent === "string" && body.agent ? body.agent : ctx.config.agent;
+			const result = await signIn(signingInAgent, {
 				signal: controller.signal,
 				methodId: typeof body.methodId === "string" ? body.methodId : undefined,
 				// The app has no terminal: only agent methods (the agent runs its own flow).

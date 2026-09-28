@@ -27,10 +27,19 @@ export function addAi(id: string): void {
 	saveConfig({ ...config, ais: [...(config.ais ?? []), id] });
 }
 
-/** Take `id` off Your AIs. */
+/** Take `id` off Your AIs, with its model choice and what Leuria remembers of it. */
 export function removeAi(id: string): void {
 	const config = loadConfig();
-	saveConfig({ ...config, ais: (config.ais ?? []).filter((a) => a !== id) });
+	const { [id]: _model, ...models } = config.models ?? {};
+	const { [id]: _ready, ...ready } = config.ready ?? {};
+	saveConfig({ ...config, ais: (config.ais ?? []).filter((a) => a !== id), models, ready });
+}
+
+/** Does anything but the AI being removed still use this LLM service: the default AI, another of Your AIs, embeddings? */
+export function providerInUse(providerId: string, defaultAgent: string): boolean {
+	const config = loadConfig();
+	const uses = (id: string) => parseLlmId(id)?.providerId === providerId;
+	return uses(defaultAgent) || (config.ais ?? []).some(uses) || (typeof config.embed === "object" && config.embed.provider === providerId);
 }
 
 /**

@@ -1,8 +1,13 @@
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createAdminHandler } from "../src/admin.js";
+import { agentsDir } from "../src/agents.js";
+import { codexHome } from "../src/codex.js";
 import { GrantStore } from "../src/grants.js";
-import { loadConfig } from "../src/home.js";
+import { loadConfig, saveConfig } from "../src/home.js";
+import { getProvider, saveProvider } from "../src/llm/providers.js";
 import { type EngineHandle, startEngine } from "../src/server.js";
 
 const PORT = 19593;
@@ -172,6 +177,49 @@ describe("admin API", () => {
 		expect(grants.get(site)?.agent).toBeUndefined();
 		expect(((await (await admin("/ais")).json()) as { ais: Array<{ id: string }> }).ais.map((a) => a.id)).not.toContain(qwen);
 		expect((await admin("/ais?id=claude-acp", { method: "DELETE" })).status).toBe(409);
+	});
+
+	it("removing an agent erases its install, Leuria's sign-in for it and what Leuria remembers", async () => {
+		const install = join(agentsDir(), "codex-acp@9.9.9");
+		mkdirSync(install, { recursive: true });
+		mkdirSync(codexHome(), { recursive: true });
+		writeFileSync(join(codexHome(), "auth.json"), "{}");
+		const config = loadConfig();
+		saveConfig({
+			...config,
+			ais: [...(config.ais ?? []), "codex-acp"],
+			models: { ...config.models, "codex-acp": "gpt-5" },
+			ready: { ...config.ready, "codex-acp": new Date().toISOString() },
+		});
+		const site = "https://uses-codex.example";
+		grants.create(site);
+		grants.setAgent(site, "codex-acp");
+		grants.setModel(site, { agent: "codex-acp", id: "gpt-5" });
+
+		expect((await admin("/ais?id=codex-acp", { method: "DELETE" })).status).toBe(200);
+		expect(existsSync(install)).toBe(false);
+		expect(existsSync(codexHome())).toBe(false);
+		const after = loadConfig();
+		expect(after.ais).not.toContain("codex-acp");
+		expect(after.models?.["codex-acp"]).toBeUndefined();
+		expect(after.ready?.["codex-acp"]).toBeUndefined();
+		expect(grants.get(site)).toMatchObject({ origin: site });
+		expect(grants.get(site)?.agent).toBeUndefined();
+		expect(grants.get(site)?.model).toBeUndefined();
+	});
+
+	it("removing an AI service forgets its address and key, unless something else uses it", async () => {
+		saveProvider({ name: "Work AI", baseUrl: "https://ai.example", apiKey: "secret" });
+		await admin("/ais", { method: "POST", body: JSON.stringify({ id: "llm:work-ai" }) });
+		expect((await admin(`/ais?id=${encodeURIComponent("llm:work-ai")}`, { method: "DELETE" })).status).toBe(200);
+		expect(getProvider("work-ai")).toBeUndefined();
+
+		// Still the embedding model sites get: kept.
+		saveProvider({ name: "Embedder", baseUrl: "https://embed.example", apiKey: "secret" });
+		saveConfig({ ...loadConfig(), embed: { provider: "embedder", model: "nomic" } });
+		await admin("/ais", { method: "POST", body: JSON.stringify({ id: "llm:embedder" }) });
+		await admin(`/ais?id=${encodeURIComponent("llm:embedder")}`, { method: "DELETE" });
+		expect(getProvider("embedder")).toBeDefined();
 	});
 
 	it("keeps the previous default in Your AIs, and sites on the new default follow it", async () => {
