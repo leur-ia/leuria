@@ -7,6 +7,7 @@ import { themes as prismThemes } from "prism-react-renderer";
 import remarkRepoLinks from "./plugins/remark-repo-links.mjs";
 
 const repoUrl = "https://github.com/leur-ia/leuria";
+const demosUrl = "https://demo.leuria.dev";
 const repoDir = fileURLToPath(new URL("../..", import.meta.url));
 const docsDir = fileURLToPath(new URL("../../docs", import.meta.url));
 
@@ -102,6 +103,7 @@ const config: Config = {
 				{ type: "docSidebar", sidebarId: "docs", position: "left", label: "Docs" },
 				{ type: "docSidebar", sidebarId: "api", docsPluginId: "api", position: "left", label: "API" },
 				{ to: "/tool-builder", label: "Tool builder", position: "left" },
+				{ href: demosUrl, label: "Demos", position: "left" },
 				{ href: `${repoUrl}`, label: "GitHub", position: "right" },
 			],
 		},
@@ -112,6 +114,7 @@ const config: Config = {
 					items: [
 						{ label: "Quickstart", to: "/docs/developers/quickstart" },
 						{ label: "Examples", to: "/docs/developers/examples" },
+						{ label: "Live demos", href: demosUrl },
 						{ label: "API reference", to: "/api" },
 						{ label: "Engine protocol", to: "/docs/developers/protocol" },
 						{ label: "Ask AI for Docusaurus", to: "/docs/developers/docusaurus" },

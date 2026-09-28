@@ -58,4 +58,4 @@ The engine's own API, for writing another client, is the [engine protocol](proto
 | [`@leuria/store`](../../packages/store) | Search by meaning in the visitor's browser |
 | [`@leuria/web-embed`](../../packages/web-embed) | A small embedding model in the page |
 
-The demos, in their own repository (`leuria-demo`), use them: a shop (in React and in plain HTML), a notes site with search by meaning and a field guide with a team builder.
+The [live demos](https://demo.leuria.dev) use them: a shop (in React and in plain HTML), a notes site with search by meaning and a field guide with a team builder. Their code is in [leur-ia/demo](https://github.com/leur-ia/demo).

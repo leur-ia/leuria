@@ -42,6 +42,26 @@ const POINTS = [
 	},
 ];
 
+const DEMOS_URL = "https://demo.leuria.dev";
+
+const DEMOS = [
+	{
+		path: "shop/",
+		title: "Kiln & Co.",
+		text: "A mug shop whose assistant looks up prices and stock with the page's own tools, and fills in an order form from a free-text message.",
+	},
+	{
+		path: "notes/",
+		title: "Maren's notebook",
+		text: "A digital garden to search by meaning, with related notes and answers drawn from the notes, linked to them.",
+	},
+	{
+		path: "dex/",
+		title: "Hollowmark",
+		text: "A guide to 48 original creatures: describe one in your own words to find it, and have the AI build a team.",
+	},
+];
+
 function askAbout(question: string): void {
 	void import("@leuria/docs").then(({ openAsk }) => openAsk(question));
 }
@@ -73,6 +93,21 @@ export default function Home(): ReactNode {
 							<p>{point.text}</p>
 						</div>
 					))}
+				</section>
+
+				<section className={styles.demos}>
+					<div className={styles.demosHead}>
+						<h2>See it on real websites</h2>
+						<a href={DEMOS_URL}>All the demos →</a>
+					</div>
+					<div className={styles.demoGrid}>
+						{DEMOS.map((demo) => (
+							<a key={demo.path} className={styles.demo} href={`${DEMOS_URL}/${demo.path}`}>
+								<h3>{demo.title}</h3>
+								<p>{demo.text}</p>
+							</a>
+						))}
+					</div>
 				</section>
 
 				<section className={styles.split}>
