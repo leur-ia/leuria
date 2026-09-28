@@ -239,6 +239,24 @@ describe("bridge provider", () => {
 		convo.close();
 	});
 
+	it("says Leuria isn't running when a connect gets no answer, until the next connect", async () => {
+		const provider = bridge({ url: `http://127.0.0.1:${PORT}`, storage: memoryStorage() });
+		// Leuria never gets the link: the attempt waits on after telling so.
+		provider.client.connect = ({ onUnreached, signal } = {}) =>
+			new Promise((_, reject) => {
+				onUnreached?.();
+				signal?.addEventListener("abort", () => reject(new Error("replaced")));
+			});
+		void provider.connect().catch(() => undefined);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		expect(provider.getState().status).toBe("unavailable");
+
+		// Opened or installed since: the next connect may reach it.
+		provider.client.connect = () => new Promise(() => undefined);
+		void provider.connect();
+		expect(provider.getState()).toMatchObject({ status: "needs-action", action: "connect" });
+	});
+
 	/** Plays the visitor answering Leuria's question as soon as the site asks. */
 	function answerWhenAsked(allow = true) {
 		const timer = setInterval(() => {

@@ -124,8 +124,9 @@ export class LeuriaConnectButton extends LeuriaElement {
 	private onClick(): void {
 		const { status } = this.flow?.getState() ?? CHECKING;
 		if (status === "connected") this.toggleMenu();
-		else if (status === "not-running") this.dialog.showModal();
-		else if (status === "not-connected" || status === "declined") this.flow?.connect();
+		// Not running last time: Leuria may have been opened or installed since, so
+		// connect again (the link starts it); the dialog comes back if it still doesn't answer.
+		else if (status === "not-running" || status === "not-connected" || status === "declined") this.flow?.connect();
 	}
 
 	private menuOpen(): boolean {

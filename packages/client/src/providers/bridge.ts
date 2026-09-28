@@ -79,6 +79,10 @@ export class BridgeProvider extends BaseProvider {
 		const attempt = new AbortController();
 		this.attempt = attempt;
 		this.unreached = false;
+		// Leuria didn't answer last time: this attempt may reach it, so stop saying it isn't running.
+		if (this.getState().status === "unavailable") {
+			this.setState({ status: "needs-action", action: "connect", capabilities: [...CAPABILITIES], detail: "This site is not connected to Leuria" });
+		}
 		try {
 			await this.client.connect({
 				signal: attempt.signal,

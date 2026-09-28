@@ -114,6 +114,37 @@ describe("<leuria-connect-button>", () => {
 		expect(el.shadowRoot!.querySelector("[data-action=connect]")?.textContent).toBe("Try again");
 	});
 
+	it("tries again on a click after Leuria didn't answer, and explains again if it still doesn't", async () => {
+		const bridge = new FakeProvider("bridge", "unavailable", "Codex");
+		let tries = 0;
+		bridge.connect = async () => {
+			tries++;
+			bridge.set({ status: "needs-action" });
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			if (tries === 1) {
+				bridge.set({ status: "unavailable" });
+				throw new Error("Leuria didn't answer");
+			}
+			bridge.set({ status: "ready" });
+		};
+		const el = document.createElement("leuria-connect-button");
+		el.client = use(bridge);
+		document.body.append(el);
+		const dialog = el.shadowRoot!.querySelector<HTMLDialogElement>(".dialog")!;
+		button(el).click();
+		expect(tries).toBe(1);
+		expect(dialog.open).toBe(false);
+		expect(button(el).textContent).toBe("Waiting for your approval…");
+		await wait();
+		expect(dialog.open).toBe(true);
+		dialog.close();
+		button(el).click();
+		expect(tries).toBe(2);
+		await wait();
+		expect(dialog.open).toBe(false);
+		expect(button(el).textContent).toBe("ConnectedCodex");
+	});
+
 	it("offers the other AIs as secondary choices, for this page only", async () => {
 		class OwnAI extends FakeProvider {
 			readonly asksFirst = true;
