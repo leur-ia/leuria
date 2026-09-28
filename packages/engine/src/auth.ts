@@ -186,6 +186,15 @@ function checkTimeoutMs(): number {
 	return Number.isFinite(value) && value > 0 ? value : 15_000;
 }
 
+/**
+ * How long a sign-in may go without opening a page before the agent is
+ * started again (Codex opens it within 2–3 s). `LEURIA_SIGNIN_STALL_MS` overrides it.
+ */
+function signInStallMs(): number {
+	const value = Number(process.env.LEURIA_SIGNIN_STALL_MS);
+	return Number.isFinite(value) && value > 0 ? value : 10_000;
+}
+
 /** Is the visitor signed in to this agent? Opens (and closes) a real ACP session, within a time limit. */
 export async function checkSignIn(id: string, onProgress?: (message: string) => void): Promise<SignInStatus> {
 	if (isLlmId(id)) return checkLlm(id);
@@ -232,7 +241,14 @@ export async function signIn(
 	} = {},
 ): Promise<SignInStatus> {
 	if (isLlmId(id)) return checkLlm(id);
-	const link = options.onUrl && !options.terminal ? catchBrowserLinks(options.onUrl) : null;
+	let pageOpened = false;
+	const link =
+		options.onUrl && !options.terminal
+			? catchBrowserLinks((url) => {
+					pageOpened = true;
+					options.onUrl?.(url);
+				})
+			: null;
 	let opened: Awaited<ReturnType<typeof open>>;
 	try {
 		opened = await open(id, options.onProgress, options.terminal, link?.env);
@@ -240,11 +256,31 @@ export async function signIn(
 		link?.stop();
 		throw error;
 	}
-	const { agent, session, env, sandbox } = opened;
+	const { agent, env, sandbox } = opened;
 	const close = () => {
 		opened.close();
 		link?.stop();
 	};
+	/**
+	 * `authenticate`, or "stalled" when the agent opens no sign-in page in time. Only
+	 * where Leuria sees the pages agents open (not Windows, not a terminal sign-in).
+	 */
+	async function authenticateOrStall(session: AcpLiveSession, methodId: string): Promise<{ error?: string } | "stalled"> {
+		const auth = session.authenticate(methodId);
+		if (!link) return auth;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const stalled = new Promise<"stalled">((resolve) => {
+			timer = setTimeout(() => {
+				if (!pageOpened) resolve("stalled");
+			}, signInStallMs());
+		});
+		try {
+			return await Promise.race([auth, stalled]);
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
 	const cancelled = new Promise<SignInStatus>((resolve) => {
 		const onAbort = () => {
 			// Settle as cancelled before stopping the agent, whose pending call then fails.
@@ -261,6 +297,7 @@ export async function signIn(
 	}
 
 	async function run(): Promise<SignInStatus> {
+		let session = opened.session;
 		const connected = await session.connect();
 		if (connected.error) return { ok: false, detail: `the agent did not start: ${connected.error}`, methods: [] };
 		const all = session.info?.authMethods ?? [];
@@ -290,7 +327,18 @@ export async function signIn(
 			return checkSignIn(id, options.onProgress);
 		}
 
-		const auth = await session.authenticate(method.id);
+		let auth = await authenticateOrStall(session, method.id);
+		if (auth === "stalled") {
+			// No sign-in page after a while: the agent got stuck before opening one (Codex can,
+			// on a first try). A fresh agent gets through, as a second try by hand does.
+			opened.close();
+			if (options.signal?.aborted) return { ok: false, detail: "cancelled", methods };
+			opened = await open(id, options.onProgress, options.terminal, link?.env);
+			session = opened.session;
+			const again = await session.connect();
+			if (again.error) return { ok: false, detail: `the agent did not start: ${again.error}`, methods };
+			auth = await session.authenticate(method.id);
+		}
 		// The agent's own words (codex-acp says "Invalid params" for a login that did not
 		// succeed); the app shows only reasons written for people.
 		if (auth.error) return { ok: false, detail: auth.error, methods };

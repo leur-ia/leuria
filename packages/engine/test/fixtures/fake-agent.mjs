@@ -3,6 +3,7 @@
 // tool through the engine's MCP endpoint, then replies with the result.
 // A prompt containing "bash" makes it ask permission for a built-in tool.
 import { spawn } from "node:child_process";
+import { existsSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 // FAKE_NO_HTTP=1: advertise no HTTP MCP, so the client must give a stdio server.
@@ -58,15 +59,25 @@ async function handle(msg) {
 				result: {
 					protocolVersion: msg.params.protocolVersion,
 					agentCapabilities: { promptCapabilities: { image: true }, mcpCapabilities: { http: httpMcp } },
+					authMethods: [{ id: "account", name: "Fake account" }],
 				},
 			});
+		case "authenticate":
+			// FAKE_STALL_ONCE=<file>: the first sign-in hangs without opening a page (as Codex can);
+			// the file marks it, so the next agent signs in.
+			if (process.env.FAKE_STALL_ONCE && !existsSync(process.env.FAKE_STALL_ONCE)) {
+				writeFileSync(process.env.FAKE_STALL_ONCE, "stalled");
+				return;
+			}
+			return send({ id: msg.id, result: {} });
 		case "session/new": {
 			// FAKE_HANG=1: never answer, like an agent waiting to be set up elsewhere.
 			if (process.env.FAKE_HANG) return;
 			// FAKE_SIGNED_OUT=1: ACP auth_required.
 			if (process.env.FAKE_SIGNED_OUT) return send({ id: msg.id, error: { code: -32000, message: "Authentication required" } });
 			const server = msg.params.mcpServers[0];
-			if (server.command) {
+			// No page tools (a sign-in check): nothing to connect.
+			if (server?.command) {
 				// stdio MCP server: one JSON-RPC message per line.
 				const child = spawn(server.command, server.args, {
 					env: { ...process.env, ...Object.fromEntries(server.env.map((e) => [e.name, e.value])) },
@@ -83,7 +94,7 @@ async function handle(msg) {
 						waiting.set(id, resolve);
 						child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
 					});
-			} else {
+			} else if (server) {
 				mcp = {
 					url: server.url,
 					headers: Object.fromEntries(server.headers.map((h) => [h.name, h.value])),
