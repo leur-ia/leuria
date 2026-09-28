@@ -1,6 +1,6 @@
 [package]
 name = "leuria-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Leuria: bring your own AI to the web"
 license = "Apache-2.0"
 edition = "2021"
