@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="53 30 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Leuria app icon</title>
+  <desc id="desc">Deep Ink manta and star on the Leuria Pearl pastel atmosphere.</desc>
+  <defs>
+    <clipPath id="tile"><rect x="53" y="30" width="256" height="256" rx="55"/></clipPath>
+    <radialGradient id="blush" cx="0" cy="0" r="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#F9DCE6"/><stop offset="1" stop-color="#F9DCE6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ice" cx="1" cy="0" r="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#CDE8F7"/><stop offset="1" stop-color="#CDE8F7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mint" cx="1" cy="1" r="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#D3F3E6"/><stop offset="1" stop-color="#D3F3E6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lavender" cx="0" cy="1" r="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#D9D0FF"/><stop offset="1" stop-color="#D9D0FF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="53" y="30" width="256" height="256" fill="#EEF0F7"/>
+    <rect x="53" y="30" width="256" height="256" fill="url(#blush)" opacity=".7"/>
+    <rect x="53" y="30" width="256" height="256" fill="url(#ice)" opacity=".8"/>
+    <rect x="53" y="30" width="256" height="256" fill="url(#mint)" opacity=".85"/>
+    <rect x="53" y="30" width="256" height="256" fill="url(#lavender)" opacity=".8"/>
+  </g>
+  <g fill="#14172B" transform="translate(45.25 39.5) scale(.75)">
+    <path d="M181 61 C184 74 191 82 206 86 C191 90 184 98 181 111 C178 98 171 90 156 86 C171 82 178 74 181 61 Z"/>
+    <path d="M59 92 C60 109 67 128 79 143 C91 158 105 168 124 174 C149 182 164 193 171 207 C177 219 177 239 177 255 C182 255 182 240 184 226 C188 199 201 187 223 179 C247 171 270 158 284 142 C298 127 303 109 303 92 C298 91 292 101 284 108 C265 125 245 130 226 126 C217 124 211 114 205 112 C199 110 199 116 199 121 C198 127 191 130 181 130 C171 130 165 127 163 121 C162 116 165 110 159 111 C151 112 148 122 137 126 C118 131 98 125 78 109 C69 102 65 91 59 92 Z"/>
+  </g>
+</svg>

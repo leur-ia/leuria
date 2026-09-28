@@ -1,0 +1,18 @@
+{
+  "name": "leuria-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter './packages/*' build",
+    "test": "pnpm -r test",
+    "check": "pnpm -r check",
+    "start": "pnpm --filter @leuria/cli start",
+    "desktop": "pnpm --filter @leuria/desktop dev",
+    "portal": "pnpm --filter @leuria/portal dev",
+    "portal:build": "pnpm --filter @leuria/portal build",
+    "desktop:build": "pnpm --filter @leuria/desktop build"
+  }
+}

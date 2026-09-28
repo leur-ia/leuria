@@ -1,0 +1,78 @@
+name: Release
+
+# Push a tag like v0.1.0 (the version in apps/desktop/src-tauri/tauri.conf.json):
+# this builds Leuria for Apple Silicon and Intel Macs into a draft release.
+# Publishing the draft makes it the download on leuria.eu, the update running
+# apps install, and the Homebrew cask in Casks/ (see homebrew.yml).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            name: apple-silicon
+          - target: x86_64-apple-darwin
+            name: intel
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: The tag matches the app's version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME, app version $version"; exit 1; }
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the engine
+        run: pnpm --filter @leuria/desktop build:engine
+        env:
+          TAURI_ENV_TARGET_TRIPLE: ${{ matrix.target }}
+
+      - name: Build and upload the app
+        id: tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs updates (not the app: it is ad-hoc signed until Leuria has an Apple Developer ID).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          # tauri.release.conf.json adds the update files, which need the signing key above.
+          args: --target ${{ matrix.target }} --config src-tauri/tauri.release.conf.json
+          tagName: v__VERSION__
+          releaseName: Leuria __VERSION__
+          releaseBody: Download Leuria for your Mac below, or install it with Homebrew.
+          releaseDraft: true
+
+      # Stable names, so leuria.eu and the cask can link to .../latest/download/<name>.
+      - name: Upload the installer under a stable name
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          dmg=$(ls apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg)
+          cp "$dmg" "Leuria-mac-${{ matrix.name }}.dmg"
+          gh release upload "v$version" "Leuria-mac-${{ matrix.name }}.dmg" --clobber

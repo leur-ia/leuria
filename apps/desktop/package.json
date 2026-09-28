@@ -1,0 +1,37 @@
+{
+  "name": "@leuria/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Leuria desktop app: the engine, a tray icon, onboarding and site approvals.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm build:engine && tauri dev",
+    "build": "pnpm build:engine && tauri build",
+    "build:engine": "node scripts/build-engine.mjs",
+    "ui:dev": "vite",
+    "ui:build": "tsc --noEmit && vite build",
+    "check": "tsc --noEmit",
+    "tauri": "tauri",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@leuria/pearl": "workspace:*",
+    "@radix-ui/themes": "^3.3.0",
+    "@sinuxjs/core": "^2.0.4",
+    "@sinuxjs/react": "^2.0.4",
+    "@tauri-apps/api": "^2.12.0",
+    "@tauri-apps/plugin-autostart": "^2.6.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.1.0",
+    "typescript": "^5.9.0",
+    "vite": "^8.3.0",
+    "vitest": "^3.2.0"
+  }
+}

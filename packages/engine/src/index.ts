@@ -1,0 +1,15 @@
+export { startEngine, DEFAULT_PORT, VERSION } from "./server.js";
+export type { EngineHandle, EngineOptions } from "./server.js";
+export { GrantStore, normalizeOrigin } from "./grants.js";
+export type { Grant } from "./grants.js";
+export { agentName, ensureAgent, installedAgent, listAgents, resolveAgentCommand } from "./agents.js";
+export type { InstalledAgent } from "./agents.js";
+export { checkSignIn, signIn } from "./auth.js";
+export { detectInstalledClis } from "./detect.js";
+export { fetchRegistry, getRegistryEntry } from "./acp/registry.js";
+export type { RegistryEntry } from "./acp/registry.js";
+export type { SessionInfo, SessionStatus, PrepareParams, AgentLaunch } from "./session-manager.js";
+export type { ToolCallEvent } from "./acp/acp-client.js";
+export { buildSessionMeta, decidePermission, WEBMCP_SERVER_NAME } from "./policy.js";
+export { createLogger } from "./logger.js";
+export type { Logger } from "./logger.js";

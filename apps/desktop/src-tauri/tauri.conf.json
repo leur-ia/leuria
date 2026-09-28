@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Leuria",
+  "version": "0.1.0",
+  "identifier": "eu.leuria.app",
+  "build": {
+    "beforeDevCommand": "pnpm ui:dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm ui:build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Leuria",
+        "width": 440,
+        "height": 640,
+        "minWidth": 380,
+        "minHeight": 520,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:*; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Use your own AI on websites",
+    "externalBin": [
+      "binaries/leuria-engine"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0",
+      "entitlements": "./Entitlements.plist"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "leuria"
+        ]
+      }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMyMDA0RjRCMUNBODFBM0IKUldRN0dxZ2NTMDhBTXJ0cng0c0U3aDNkVitRWWtRaThPK1RaZ0ZOdFFUTnNCNktzVXFuUGlTWDcK",
+      "endpoints": [
+        "https://github.com/leur-ia/leuria/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "@leuria/cli",
+  "version": "0.1.0",
+  "description": "Bring your own AI to the web: the Leuria engine. Lets websites you approve use the AI on your machine, through tools the page provides.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leur-ia/leuria.git",
+    "directory": "packages/engine"
+  },
+  "homepage": "https://leuria.dev",
+  "bin": { "leuria": "./dist/cli.js" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "files": ["dist"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/cli.ts start",
+    "start": "tsx src/cli.ts start",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.5.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "tsup": "^8.4.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

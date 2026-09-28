@@ -1,0 +1,38 @@
+/* App layout only: every colour, radius and type value comes from @leuria/pearl. */
+html, body, #root { height: 100%; }
+body { margin: 0; background: var(--bg); -webkit-user-select: none; user-select: none; }
+.radix-themes { min-height: 100%; }
+.app { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-5) var(--space-6); max-width: 520px; margin: 0 auto; }
+.app-header { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
+.onboarding { min-height: 100vh; display: flex; flex-direction: column; }
+.onboarding .pearl-surface { flex: 1; display: flex; }
+.onboarding .pearl-surface-content { flex: 1; display: flex; flex-direction: column; gap: var(--space-5); width: 100%; max-width: 480px; margin: 0 auto; }
+.steps { display: flex; gap: var(--space-2); }
+.steps span { flex: 1; height: 4px; border-radius: 9999px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.steps span.done { background: var(--ink); }
+.selectable { -webkit-user-select: text; user-select: text; }
+.site-row { display: flex; flex-direction: column; gap: var(--space-2); padding-block: var(--space-3); border-top: 1px solid var(--border); }
+.site-row:first-child { border-top: none; padding-top: 0; }
+.site-row:last-child { padding-bottom: 0; }
+/* The site a "Change AI or model…" link opened. */
+.site-row.focused { box-shadow: inset 3px 0 0 var(--accent-9); padding-left: var(--space-3); }
+.can-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.can-list li { display: flex; align-items: center; gap: var(--space-2); font-size: 14px; }
+.start { min-height: 100vh; display: flex; flex-direction: column; }
+.start .pearl-surface { flex: 1; display: flex; }
+.start .pearl-surface-content { flex: 1; display: flex; }
+.start-content { flex: 1; }
+.start-card { width: 100%; max-width: 420px; }
+.disclosure-chevron { display: inline-flex; transform: rotate(-90deg); transition: transform var(--timing-fast) var(--easing-standard); }
+.disclosure-chevron.open { transform: none; }
+.text-link { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; color: inherit; }
+.ai-row { display: flex; flex-direction: column; gap: var(--space-2); padding-block: var(--space-3); border-top: 1px solid var(--border); }
+.ai-row:first-child { border-top: none; padding-top: 0; }
+.ai-add { padding-bottom: 0; }
+
+/* A model's fit for a site: icon and words, never colour alone. */
+.fit { display: inline-flex; align-items: center; gap: var(--space-1); }
+.fit-live { color: var(--live-text); }
+.fit-pending { color: var(--pending-text); }
+.fit-blocked { color: var(--blocked-text); }
+.ai-choice-change { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }

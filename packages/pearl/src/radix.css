@@ -1,0 +1,236 @@
+/*
+ * Leuria Pearl on Radix Themes (design_system/radix.md). Load after
+ * `@radix-ui/themes/styles.css`. The Theme root uses accentColor="violet",
+ * grayColor="mauve", radius="full"; these overrides replace violet and
+ * mauve with Lavender and Pearl, step for step.
+ */
+.radix-themes {
+	--default-font-family: var(--font-sans);
+	--heading-font-family: var(--font-sans);
+	--code-font-family: var(--font-mono);
+
+	--accent-1: var(--lavender-1);
+	--accent-2: var(--lavender-2);
+	--accent-3: var(--lavender-3);
+	--accent-4: var(--lavender-4);
+	--accent-5: var(--lavender-5);
+	--accent-6: var(--lavender-6);
+	--accent-7: var(--lavender-7);
+	--accent-8: var(--lavender-8);
+	--accent-9: var(--lavender-9);
+	--accent-10: var(--lavender-10);
+	--accent-11: var(--lavender-11);
+	--accent-12: var(--lavender-12);
+	--accent-contrast: #ffffff;
+
+	--gray-1: var(--pearl-1);
+	--gray-2: var(--pearl-2);
+	--gray-3: var(--pearl-3);
+	--gray-4: var(--pearl-4);
+	--gray-5: var(--pearl-5);
+	--gray-6: var(--pearl-6);
+	--gray-7: var(--pearl-7);
+	--gray-8: var(--pearl-8);
+	--gray-9: var(--pearl-9);
+	--gray-10: var(--pearl-10);
+	--gray-11: var(--pearl-11);
+	--gray-12: var(--pearl-12);
+
+	--color-background: var(--bg);
+	--color-panel-solid: var(--surface);
+	--color-panel-translucent: var(--surface-translucent);
+	--focus-8: var(--focus);
+
+	/* Pearl shadows are tinted with Deep Ink. */
+	--shadow-2: var(--pearl-shadow-2, 0 2px 8px -2px rgba(20, 23, 43, 0.08), 0 1px 2px rgba(20, 23, 43, 0.05));
+	-webkit-font-smoothing: antialiased;
+}
+
+/* Radius: actions are pills (radius="full"); inputs 12px, cards 16px, dialogs 24px. */
+.radix-themes .rt-BaseCard { --card-border-radius: 16px; }
+.radix-themes .rt-BaseDialogContent { border-radius: 24px; box-shadow: var(--pearl-shadow-5); }
+.radix-themes .rt-TextFieldRoot { --text-field-border-radius: 12px; }
+.radix-themes .rt-SelectTrigger { border-radius: 12px; }
+.radix-themes .rt-RadioCardsItem { --radio-cards-item-border-radius: 16px; border-radius: 16px; min-height: 68px; }
+
+/* Ink: the ONE primary action per view (Pearl Button color="ink"). */
+.radix-themes .rt-Button.pearl-ink:where(.rt-variant-solid) {
+	background-color: var(--ink);
+	color: var(--on-ink);
+}
+.radix-themes .rt-Button.pearl-ink:where(.rt-variant-solid):hover { background-color: var(--ink-hover); }
+/* Disabled fades the ink; loading keeps it (the button still answers, Doherty Threshold). */
+.radix-themes .rt-Button.pearl-ink:where(.rt-variant-solid)[data-disabled] { background-color: var(--ink); color: var(--on-ink); opacity: 0.5; }
+.radix-themes .rt-Button.pearl-ink:where(.rt-variant-solid)[data-disabled]:has(.rt-Spinner) { opacity: 1; }
+
+
+/*
+ * State colours. Screens use Radix names (red, green, amber, blue); they are
+ * Pearl's Clay (blocked), Sage (live), Ochre (pending) and Ice (info), step for
+ * step. Pearl has no alpha scales: the solid step stands in for Radix's alpha
+ * one, and for the accent too, so soft variants stay on Pearl colours.
+ */
+.radix-themes {
+	--red-1: var(--clay-1);
+	--red-2: var(--clay-2);
+	--red-3: var(--clay-3);
+	--red-4: var(--clay-4);
+	--red-5: var(--clay-5);
+	--red-6: var(--clay-6);
+	--red-7: var(--clay-7);
+	--red-8: var(--clay-8);
+	--red-9: var(--clay-9);
+	--red-10: var(--clay-10);
+	--red-11: var(--clay-11);
+	--red-12: var(--clay-12);
+	--red-a1: var(--clay-1);
+	--red-a2: var(--clay-2);
+	--red-a3: var(--clay-3);
+	--red-a4: var(--clay-4);
+	--red-a5: var(--clay-5);
+	--red-a6: var(--clay-6);
+	--red-a7: var(--clay-7);
+	--red-a8: var(--clay-8);
+	--red-a9: var(--clay-9);
+	--red-a10: var(--clay-10);
+	--red-a11: var(--clay-11);
+	--red-a12: var(--clay-12);
+	--red-contrast: #ffffff;
+	--red-surface: var(--clay-2);
+	--red-indicator: var(--clay-9);
+	--red-track: var(--clay-9);
+	--green-1: var(--sage-1);
+	--green-2: var(--sage-2);
+	--green-3: var(--sage-3);
+	--green-4: var(--sage-4);
+	--green-5: var(--sage-5);
+	--green-6: var(--sage-6);
+	--green-7: var(--sage-7);
+	--green-8: var(--sage-8);
+	--green-9: var(--sage-9);
+	--green-10: var(--sage-10);
+	--green-11: var(--sage-11);
+	--green-12: var(--sage-12);
+	--green-a1: var(--sage-1);
+	--green-a2: var(--sage-2);
+	--green-a3: var(--sage-3);
+	--green-a4: var(--sage-4);
+	--green-a5: var(--sage-5);
+	--green-a6: var(--sage-6);
+	--green-a7: var(--sage-7);
+	--green-a8: var(--sage-8);
+	--green-a9: var(--sage-9);
+	--green-a10: var(--sage-10);
+	--green-a11: var(--sage-11);
+	--green-a12: var(--sage-12);
+	--green-contrast: #ffffff;
+	--green-surface: var(--sage-2);
+	--green-indicator: var(--sage-9);
+	--green-track: var(--sage-9);
+	--amber-1: var(--ochre-1);
+	--amber-2: var(--ochre-2);
+	--amber-3: var(--ochre-3);
+	--amber-4: var(--ochre-4);
+	--amber-5: var(--ochre-5);
+	--amber-6: var(--ochre-6);
+	--amber-7: var(--ochre-7);
+	--amber-8: var(--ochre-8);
+	--amber-9: var(--ochre-9);
+	--amber-10: var(--ochre-10);
+	--amber-11: var(--ochre-11);
+	--amber-12: var(--ochre-12);
+	--amber-a1: var(--ochre-1);
+	--amber-a2: var(--ochre-2);
+	--amber-a3: var(--ochre-3);
+	--amber-a4: var(--ochre-4);
+	--amber-a5: var(--ochre-5);
+	--amber-a6: var(--ochre-6);
+	--amber-a7: var(--ochre-7);
+	--amber-a8: var(--ochre-8);
+	--amber-a9: var(--ochre-9);
+	--amber-a10: var(--ochre-10);
+	--amber-a11: var(--ochre-11);
+	--amber-a12: var(--ochre-12);
+	--amber-contrast: #ffffff;
+	--amber-surface: var(--ochre-2);
+	--amber-indicator: var(--ochre-9);
+	--amber-track: var(--ochre-9);
+	--blue-1: var(--ice-1);
+	--blue-2: var(--ice-2);
+	--blue-3: var(--ice-3);
+	--blue-4: var(--ice-4);
+	--blue-5: var(--ice-5);
+	--blue-6: var(--ice-6);
+	--blue-7: var(--ice-7);
+	--blue-8: var(--ice-8);
+	--blue-9: var(--ice-9);
+	--blue-10: var(--ice-10);
+	--blue-11: var(--ice-11);
+	--blue-12: var(--ice-12);
+	--blue-a1: var(--ice-1);
+	--blue-a2: var(--ice-2);
+	--blue-a3: var(--ice-3);
+	--blue-a4: var(--ice-4);
+	--blue-a5: var(--ice-5);
+	--blue-a6: var(--ice-6);
+	--blue-a7: var(--ice-7);
+	--blue-a8: var(--ice-8);
+	--blue-a9: var(--ice-9);
+	--blue-a10: var(--ice-10);
+	--blue-a11: var(--ice-11);
+	--blue-a12: var(--ice-12);
+	--blue-contrast: #ffffff;
+	--blue-surface: var(--ice-2);
+	--blue-indicator: var(--ice-9);
+	--blue-track: var(--ice-9);
+	--accent-a1: var(--lavender-1);
+	--accent-a2: var(--lavender-2);
+	--accent-a3: var(--lavender-3);
+	--accent-a4: var(--lavender-4);
+	--accent-a5: var(--lavender-5);
+	--accent-a6: var(--lavender-6);
+	--accent-a7: var(--lavender-7);
+	--accent-a8: var(--lavender-8);
+	--accent-a9: var(--lavender-9);
+	--accent-a10: var(--lavender-10);
+	--accent-a11: var(--lavender-11);
+	--accent-a12: var(--lavender-12);
+}
+
+/*
+ * Fitts's Law: every control keeps a 44px hit area (target-min) even when
+ * drawn smaller. The ring only grows the target, not the drawing.
+ */
+.radix-themes :where(.rt-BaseButton:not(.rt-variant-classic), .rt-SelectTrigger) { position: relative; }
+.radix-themes :where(.rt-BaseButton:not(.rt-variant-classic), .rt-SelectTrigger)::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 50%;
+	height: max(100%, var(--target-min, 44px));
+	transform: translateY(-50%);
+}
+
+/* Every interactive element: a visible 2px focus ring with a 2px offset. */
+.radix-themes :where(button, a, input, [role="radio"], [role="switch"], [role="combobox"]):focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+/* A text field rings its whole box (icons included), not the bare input inside it. */
+.radix-themes .rt-TextFieldInput:focus-visible { outline: none; }
+.radix-themes .rt-TextFieldRoot:focus-within {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.radix-themes *, .radix-themes *::before, .radix-themes *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
+/* Tabs underline in ink (design_system/radix.md: "Underline indicator in ink"). */
+.radix-themes .rt-BaseTabListTrigger:where([data-state="active"], [data-active]) { color: var(--ink); }
+.radix-themes .rt-BaseTabListTrigger:where([data-state="active"], [data-active])::before { background-color: var(--ink); }
+
+/* Switches: an ink track when on (design_system Switch: "thumb position + ink track"). */
+.radix-themes .rt-SwitchRoot { --accent-track: var(--ink); }

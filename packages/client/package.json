@@ -1,0 +1,32 @@
+{
+  "name": "@leuria/client",
+  "version": "0.1.0",
+  "description": "Browser SDK for Leuria: connect a page to the visitor's own AI and give it the page's tools.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leur-ia/leuria.git",
+    "directory": "packages/client"
+  },
+  "homepage": "https://leuria.dev",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "check": "tsc --noEmit && tsc -p test",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@leuria/cli": "workspace:*",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

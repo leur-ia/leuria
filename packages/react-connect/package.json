@@ -1,0 +1,44 @@
+{
+  "name": "@leuria/react-connect",
+  "version": "0.1.0",
+  "description": "Leuria's Connect UI as React components: the @leuria/connect web components, fed by @leuria/react.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leur-ia/leuria.git",
+    "directory": "packages/react-connect"
+  },
+  "homepage": "https://leuria.dev",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@leuria/connect": "workspace:^",
+    "@leuria/react": "workspace:^"
+  },
+  "peerDependencies": {
+    "@leuria/client": "workspace:^",
+    "react": "^18.2.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@leuria/client": "workspace:*",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.2.0",
+    "happy-dom": "^20.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "@leuria/pearl",
+  "version": "0.1.0",
+  "description": "Leuria Pearl: design tokens, Radix Themes mapping and Pearl-only React components (Logo, PearlSurface, BridgeStatus, Icon, Toast).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./tokens.css": "./src/tokens.css"
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@heroicons/react": "^2.2.0",
+    "@radix-ui/themes": "^3.3.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.0"
+  }
+}

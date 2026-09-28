@@ -1,0 +1,40 @@
+{
+  "name": "@leuria/connect",
+  "version": "0.1.0",
+  "description": "Leuria's Connect UI as web components: the \"Connect your AI\" button, the AI status and the Leuria badge, in Leuria Pearl, for any framework.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leur-ia/leuria.git",
+    "directory": "packages/connect"
+  },
+  "homepage": "https://leuria.dev",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./standalone": { "types": "./dist/standalone.d.ts", "import": "./dist/standalone.js" },
+    "./element": { "types": "./dist/kit.d.ts", "import": "./dist/kit.js" }
+  },
+  "files": ["dist", "fonts"],
+  "sideEffects": ["./dist/index.js", "./dist/standalone.js", "./src/index.ts"],
+  "scripts": {
+    "prepare-sources": "node scripts/prepare.mjs",
+    "build": "node scripts/prepare.mjs && tsup",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@leuria/client": "workspace:^"
+  },
+  "devDependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@leuria/client": "workspace:*",
+    "@leuria/pearl": "workspace:*",
+    "happy-dom": "^20.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

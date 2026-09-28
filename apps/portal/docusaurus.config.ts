@@ -1,0 +1,138 @@
+import { fileURLToPath } from "node:url";
+
+import type * as Preset from "@docusaurus/preset-classic";
+import type { Config } from "@docusaurus/types";
+import { themes as prismThemes } from "prism-react-renderer";
+
+import remarkRepoLinks from "./plugins/remark-repo-links.mjs";
+
+const repoUrl = "https://github.com/leur-ia/leuria";
+const repoDir = fileURLToPath(new URL("../..", import.meta.url));
+const docsDir = fileURLToPath(new URL("../../docs", import.meta.url));
+
+const config: Config = {
+	title: "Leuria",
+	tagline: "Bring your own AI to the web",
+	favicon: "img/favicon.svg",
+	url: "https://leuria.dev",
+	baseUrl: "/",
+	organizationName: "leur-ia",
+	projectName: "leuria",
+	trailingSlash: false,
+
+	onBrokenLinks: "throw",
+	markdown: {
+		// .md files are CommonMark (they must read well on GitHub too); .mdx is MDX.
+		format: "detect",
+		mermaid: true,
+		hooks: { onBrokenMarkdownLinks: "throw" },
+	},
+	// Cascade layers are off: for this site's browser targets the build replaces
+	// them with specificity boosts, and Infima's then beat custom.css.
+	future: {
+		v4: {
+			removeLegacyPostBuildHeadAttribute: true,
+			useCssCascadeLayers: false,
+			siteStorageNamespacing: true,
+			fasterByDefault: true,
+			mdx1CompatDisabledByDefault: true,
+		},
+		faster: true,
+	},
+	i18n: { defaultLocale: "en", locales: ["en"] },
+
+	presets: [
+		[
+			"classic",
+			{
+				docs: {
+					path: docsDir,
+					routeBasePath: "docs",
+					sidebarPath: "./sidebars.ts",
+					editUrl: `${repoUrl}/edit/main/docs/`,
+					beforeDefaultRemarkPlugins: [[remarkRepoLinks, { repoDir, docsDir, repoUrl }]],
+				},
+				blog: false,
+				theme: { customCss: "./src/css/custom.css" },
+			} satisfies Preset.Options,
+		],
+	],
+
+	themes: ["@docusaurus/theme-mermaid"],
+
+	plugins: [
+		[
+			// The API reference, from the packages' TSDoc: markdown in api/ (not committed), served at /api.
+			"docusaurus-plugin-typedoc",
+			{
+				id: "typedoc",
+				entryPointStrategy: "packages",
+				entryPoints: ["client", "react", "connect", "react-connect", "store", "web-embed", "docs", "docusaurus"].map((name) => `../../packages/${name}`),
+				packageOptions: { entryPoints: ["src/index.ts"], excludeInternal: true, readme: "none" },
+				out: "api",
+				readme: "none",
+				excludePrivate: true,
+				excludeProtected: true,
+				sidebar: { pretty: true },
+			},
+		],
+		[
+			"@docusaurus/plugin-content-docs",
+			{ id: "api", path: "api", routeBasePath: "api", sidebarPath: "./sidebars-api.ts", editUrl: undefined },
+		],
+		[
+			"@leuria/docusaurus",
+			{
+				app: "Leuria docs",
+				search: true,
+				connectButton: true,
+				pageEmbeddings: true,
+				suggestions: ["How do I add Leuria to my site?", "How do page tools work?", "What happens when the visitor has no AI?"],
+			},
+		],
+		["docusaurus-plugin-llms", { docsDir: "../../docs", generateMarkdownFiles: true }],
+	],
+
+	themeConfig: {
+		colorMode: { respectPrefersColorScheme: true },
+		navbar: {
+			title: "leuria",
+			logo: { alt: "", src: "img/mark.svg", srcDark: "img/mark-dark.svg", width: 28, height: 28 },
+			items: [
+				{ type: "docSidebar", sidebarId: "docs", position: "left", label: "Docs" },
+				{ type: "docSidebar", sidebarId: "api", docsPluginId: "api", position: "left", label: "API" },
+				{ to: "/tool-builder", label: "Tool builder", position: "left" },
+				{ href: `${repoUrl}`, label: "GitHub", position: "right" },
+			],
+		},
+		footer: {
+			links: [
+				{
+					title: "Build",
+					items: [
+						{ label: "Quickstart", to: "/docs/developers/quickstart" },
+						{ label: "Examples", to: "/docs/developers/examples" },
+						{ label: "API reference", to: "/api" },
+						{ label: "Engine protocol", to: "/docs/developers/protocol" },
+						{ label: "Ask AI for Docusaurus", to: "/docs/developers/docusaurus" },
+					],
+				},
+				{
+					title: "Use",
+					items: [{ label: "Getting started", to: "/docs/users/getting-started" }],
+				},
+				{
+					title: "Project",
+					items: [
+						{ label: "GitHub", href: repoUrl },
+						{ label: "Security", to: "/docs/security" },
+					],
+				},
+			],
+			copyright: "Leuria · Apache-2.0",
+		},
+		prism: { theme: prismThemes.github, darkTheme: prismThemes.dracula, additionalLanguages: ["bash", "json"] },
+	} satisfies Preset.ThemeConfig,
+};
+
+export default config;

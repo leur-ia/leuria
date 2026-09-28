@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the Leuria window may do: talk to the Rust shell, listen to engine events, toggle launch at login. The engine itself is reached over its admin API with a token.",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:event:default", "autostart:default"]
+}

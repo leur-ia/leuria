@@ -1,0 +1,45 @@
+{
+  "name": "@leuria/docusaurus",
+  "version": "0.1.0",
+  "description": "Ask AI for any Docusaurus site, on the reader's own AI: no API keys, nothing to pay per question. Plus the Connect button and WebMCP tools for the browser's agents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leur-ia/leuria.git",
+    "directory": "packages/docusaurus"
+  },
+  "homepage": "https://leuria.dev",
+  "keywords": ["docusaurus", "docusaurus-plugin", "ai", "ask-ai", "search", "webmcp"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./client": { "types": "./dist/client/index.d.ts", "default": "./dist/client/index.js" }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@leuria/client": "workspace:^",
+    "@leuria/connect": "workspace:^",
+    "@leuria/docs": "workspace:^"
+  },
+  "peerDependencies": {
+    "@docusaurus/core": "^3.6.0",
+    "@leuria/web-embed": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@leuria/web-embed": { "optional": true }
+  },
+  "devDependencies": {
+    "@docusaurus/types": "^3.10.2",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

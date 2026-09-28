@@ -1,0 +1,10 @@
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+// Tauri serves the UI from this dev server in `tauri dev`.
+export default defineConfig({
+	plugins: [react()],
+	clearScreen: false,
+	server: { port: 1420, strictPort: true },
+	build: { target: "es2022", outDir: "dist" },
+});

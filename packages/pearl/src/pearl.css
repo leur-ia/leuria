@@ -1,0 +1,102 @@
+/* Pearl-only pieces (design_system/components/bundle.css), on the tokens. */
+:root {
+	/* Radix Themes redefines --shadow-N inside the theme; keep Pearl's reachable. */
+	--pearl-shadow-3: var(--shadow-3);
+	--pearl-shadow-4: var(--shadow-4);
+	--pearl-shadow-5: var(--shadow-5);
+}
+
+/* ---------- Logo ---------- */
+.pearl-logo { display: inline-flex; align-items: center; color: var(--ink); line-height: 1; }
+.pearl-logo-ceramic { color: #f4f2ee; }
+.pearl-wordmark { font-family: var(--font-sans); font-weight: 800; letter-spacing: -0.04em; line-height: 0.8; }
+.pearl-mark { display: block; flex-shrink: 0; }
+
+/* ---------- Pearl atmosphere (one per view, never behind dense UI) ---------- */
+.pearl-surface {
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
+	background:
+		radial-gradient(circle at 12% 12%, var(--atmo-blush) 0%, transparent 52%),
+		radial-gradient(circle at 88% 18%, var(--atmo-ice) 0%, transparent 54%),
+		radial-gradient(circle at 82% 92%, var(--atmo-mint) 0%, transparent 56%),
+		radial-gradient(circle at 14% 92%, var(--atmo-lavender) 0%, transparent 56%),
+		var(--atmo-base);
+}
+.pearl-surface-sheen::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background: conic-gradient(from 210deg at 60% 45%, rgba(255, 255, 255, 0) 0deg, rgba(255, 255, 255, 0.45) 40deg, rgba(255, 255, 255, 0) 90deg, rgba(255, 255, 255, 0.28) 200deg, rgba(255, 255, 255, 0) 260deg);
+}
+.pearl-surface-grain::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	pointer-events: none;
+	opacity: 0.2;
+	mix-blend-mode: multiply;
+	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+}
+.pearl-surface-content { position: relative; z-index: 1; }
+.dark .pearl-surface-sheen::before { opacity: 0.18; }
+.dark .pearl-surface-grain::after { mix-blend-mode: screen; opacity: 0.08; }
+
+/* ---------- BridgeStatus: dot + words, never colour alone ---------- */
+.pearl-status {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	height: 32px;
+	padding: 0 var(--space-3);
+	border-radius: 9999px;
+	background: var(--t-soft);
+	color: var(--t-text);
+	font-size: 14px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+.pearl-status-s1 { height: 26px; font-size: 13px; padding: 0 10px; }
+.pearl-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	background: var(--t-solid, var(--pearl-9));
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--t-solid, var(--pearl-9)) 22%, transparent);
+}
+.pearl-tone-live { --t-solid: var(--live); --t-soft: var(--live-soft); --t-text: var(--live-text); }
+.pearl-tone-pending { --t-solid: var(--pending); --t-soft: var(--pending-soft); --t-text: var(--pending-text); }
+.pearl-tone-blocked { --t-solid: var(--blocked); --t-soft: var(--blocked-soft); --t-text: var(--blocked-text); }
+.pearl-tone-idle { --t-solid: var(--pearl-9); --t-soft: var(--pearl-3); --t-text: var(--text-muted); }
+
+/* ---------- Toast: one at a time, bottom-right on desktop ---------- */
+.pearl-toast {
+	position: fixed;
+	right: var(--space-5);
+	bottom: var(--space-5);
+	z-index: 1000;
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-3);
+	width: min(360px, calc(100vw - 32px));
+	padding: var(--space-3) var(--space-4);
+	border-radius: 16px;
+	background: var(--surface);
+	color: var(--text);
+	box-shadow: var(--pearl-shadow-4);
+	animation: pearl-toast-in var(--timing-base) var(--easing-standard);
+}
+.pearl-toast-title { font-weight: 700; font-size: 14px; }
+.pearl-toast-desc { font-size: 13px; color: var(--text-muted); }
+@keyframes pearl-toast-in {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Type roles (tokens.css has the full scale) ---------- */
+.pearl-eyebrow { font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }

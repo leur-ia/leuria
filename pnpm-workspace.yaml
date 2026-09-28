@@ -1,0 +1,18 @@
+packages:
+  - packages/*
+  - apps/*
+
+onlyBuiltDependencies:
+  - esbuild
+
+# @sinuxjs/core 2.0.4 imports immer at top level without declaring it.
+packageExtensions:
+  '@sinuxjs/core@2':
+    dependencies:
+      immer: ^11.1.18
+
+# @sinuxjs/react 2.0.4 declares react ^18.2; it runs on 19 via useSyncExternalStore.
+peerDependencyRules:
+  allowedVersions:
+    '@sinuxjs/react>react': '19'
+    use-sync-external-store>react: '19'

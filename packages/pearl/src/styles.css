@@ -1,0 +1,16 @@
+/*
+ * Everything Pearl needs. Radix Themes comes FIRST: it declares its own
+ * colour scales (including a `sage`) on :root, and Pearl's tokens must win
+ * there. Pearl's semantic tokens (--live, --pending…) are resolved on :root
+ * and inherited as values, so Radix's scales inside `.radix-themes` do not
+ * change them.
+ */
+@import "@radix-ui/themes/styles.css";
+@import "@fontsource-variable/plus-jakarta-sans";
+@import "./tokens.css";
+@import "./radix.css";
+@import "./pearl.css";
+
+:root {
+	--font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}

@@ -1,0 +1,49 @@
+name: Homebrew
+
+# This repository is also a Homebrew tap. When a release is published, point
+# Casks/leuria.rb at it:
+#   brew tap leur-ia/leuria https://github.com/leur-ia/leuria
+#   brew install --cask leuria
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  cask:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Write the cask
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          mkdir -p dist Casks
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "Leuria-mac-*.dmg" --dir dist
+          sed -e "s/@VERSION@/${TAG#v}/" \
+              -e "s/@SHA_ARM@/$(sha256sum dist/Leuria-mac-apple-silicon.dmg | cut -d' ' -f1)/" \
+              -e "s/@SHA_INTEL@/$(sha256sum dist/Leuria-mac-intel.dmg | cut -d' ' -f1)/" \
+              -e "/^# Template/,/^$/d" \
+              packaging/homebrew/leuria.rb > Casks/leuria.rb
+          cat Casks/leuria.rb
+      - name: Commit it
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/leuria.rb
+          git diff --cached --quiet && exit 0
+          git commit -m "Homebrew: Leuria ${TAG#v}"
+          git push

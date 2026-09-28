@@ -1,0 +1,43 @@
+{
+  "name": "@leuria/docs",
+  "version": "0.1.0",
+  "description": "Ask AI and search by meaning for any docs site, on the reader's own AI: the corpus, the docs tools and the <leuria-ask> panel.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leur-ia/leuria.git",
+    "directory": "packages/docs"
+  },
+  "homepage": "https://leuria.dev",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" },
+    "./build": { "types": "./dist/build.d.ts", "import": "./dist/build.js", "default": "./dist/build.js" }
+  },
+  "files": ["dist"],
+  "sideEffects": ["./dist/index.js", "./src/index.ts"],
+  "scripts": {
+    "build": "tsup",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@leuria/connect": "workspace:^",
+    "@leuria/store": "workspace:^",
+    "github-slugger": "^2.0.0",
+    "marked": "^18.0.0",
+    "minisearch": "^7.2.0"
+  },
+  "peerDependencies": {
+    "@leuria/client": "workspace:^"
+  },
+  "devDependencies": {
+    "@leuria/client": "workspace:*",
+    "happy-dom": "^20.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
