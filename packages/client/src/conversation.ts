@@ -14,7 +14,7 @@
  * assistant-ui external store runtime expect.
  */
 
-import { AbortError, TimeoutError, toError } from "./errors.js";
+import { AbortError, NoProviderError, TimeoutError, toError } from "./errors.js";
 import {
 	type ContextFormatter,
 	defaultFormatContext,
@@ -75,6 +75,13 @@ export interface ConversationOptions<T = unknown> extends RoutingOptions {
 	formatContext?: ContextFormatter;
 	/** Messages to start from. */
 	messages?: MessageInput[];
+	/**
+	 * Lets an AI that can't use `tools` answer anyway, with less: when no
+	 * AI that can use them is ready, one that can't answers, and what this
+	 * returns joins the turn's context (e.g. the passages that match the
+	 * question, found by the page). Without it, `tools` are required.
+	 */
+	withoutTools?: (message: Message, options: { signal: AbortSignal }) => unknown | Promise<unknown>;
 }
 
 export interface SendOptions {
@@ -103,6 +110,8 @@ export interface ConversationState {
 	error?: Error;
 	/** Provider of the current or last turn. */
 	provider?: ProviderInfo;
+	/** That provider can't use the conversation's tools: it answered with `withoutTools`'s context instead. */
+	limited?: boolean;
 	/** Provider session: `starting` while an agent boots, `ready` once it can answer at once. */
 	session: "none" | "starting" | "ready";
 	/** Turns waiting behind the running one. */
@@ -161,6 +170,11 @@ export class Conversation<T = unknown> {
 	}
 
 	getState = (): ConversationState => this.state;
+
+	/** What this conversation's AI must be able to do for full answers (`tools` when it has some). */
+	get needs(): Capability[] {
+		return this.tools.size > 0 ? ["tools"] : [];
+	}
 
 	subscribe = (listener: () => void): (() => void) => {
 		this.listeners.add(listener);
@@ -222,7 +236,7 @@ export class Conversation<T = unknown> {
 	async warm(): Promise<boolean> {
 		let provider: Provider;
 		try {
-			provider = this.pick();
+			({ provider } = this.pick());
 		} catch {
 			return false;
 		}
@@ -252,11 +266,19 @@ export class Conversation<T = unknown> {
 
 	// ── Turn ────────────────────────────────────────────────────────────
 
-	private pick(): Provider {
-		return this.select(
-			{ tools: this.tools.size > 0, schema: Boolean(this.options.schema) },
-			this.options,
-		);
+	private pick(images = false): { provider: Provider; limited: boolean } {
+		const requirements = { tools: this.tools.size > 0, schema: Boolean(this.options.schema), images };
+		try {
+			return { provider: this.select(requirements, this.options), limited: false };
+		} catch (error) {
+			// No AI can use the tools: one that can't may answer with less, if the page allows it.
+			if (!(error instanceof NoProviderError) || !requirements.tools || !this.options.withoutTools) throw error;
+			try {
+				return { provider: this.select({ ...requirements, tools: false }, this.options), limited: true };
+			} catch {
+				throw error;
+			}
+		}
 	}
 
 	private async turn(
@@ -274,19 +296,16 @@ export class Conversation<T = unknown> {
 		// The visitor's message shows at once, even if no provider can answer.
 		this.setState({ messages: [...history, user], status: "running", error: undefined });
 
-		const provider = this.select(
-			{ tools: this.tools.size > 0, schema: Boolean(this.options.schema), images: hasImages },
-			this.options,
-		);
+		const { provider, limited } = this.pick(hasImages);
 		const info: ProviderInfo = { id: provider.id, label: provider.label, locality: provider.locality };
 		const assistantId = newId();
 		const assistant: Message = {
 			id: assistantId,
 			role: "assistant",
 			parts: [],
-			metadata: { turnId, provider: info, startedAt: Date.now() },
+			metadata: { turnId, provider: info, startedAt: Date.now(), ...(limited ? { limited: true } : {}) },
 		};
-		this.setState({ messages: [...this.state.messages, assistant], provider: info });
+		this.setState({ messages: [...this.state.messages, assistant], provider: info, limited });
 		emit({ type: "start", provider: info });
 
 		// One signal for the provider: visitor cancel, timeout, or a tool ending the turn.
@@ -344,6 +363,14 @@ export class Conversation<T = unknown> {
 		};
 
 		try {
+			if (limited) {
+				// What the page found for the question stands in for the tools this AI can't use.
+				const extra = await this.options.withoutTools!(user, { signal: turnAbort.signal });
+				if (extra !== undefined && extra !== null) {
+					user = { ...user, context: mergeContext(user.context, extra) };
+					this.setState({ messages: this.state.messages.map((m) => (m.id === user.id ? user : m)) });
+				}
+			}
 			let active: ActiveSession;
 			try {
 				this.setState({ session: this.active?.provider === provider ? this.state.session : "starting" });
@@ -532,7 +559,8 @@ export class Conversation<T = unknown> {
 		const { schema, system } = this.options;
 		const caps: Capability[] = provider.getState().capabilities;
 		const route = !schema ? null : caps.includes("structured") ? "native" : "tool";
-		const tools = [...this.tools.values()].map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+		// An AI that can't use tools gets none (it answers with `withoutTools`'s context).
+		const tools = caps.includes("tools") ? [...this.tools.values()].map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) : [];
 		if (route === "tool") {
 			// Descriptor only: execution goes through runTool and the turn's collector.
 			const { name, description, inputSchema } = new StructuredCollector({ schema: schema! }).tool();
@@ -611,4 +639,11 @@ export class Conversation<T = unknown> {
 			}
 		}
 	}
+}
+
+/** A turn's own context and what `withoutTools` found: one object when both are objects. */
+function mergeContext(context: unknown, extra: unknown): unknown {
+	if (context === undefined || context === null) return extra;
+	const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+	return { ...(isRecord(context) ? context : { Context: context }), ...(isRecord(extra) ? extra : { "Found on the page": extra }) };
 }

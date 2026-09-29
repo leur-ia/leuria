@@ -83,14 +83,14 @@ Every event carries `turnId` and `at` (ms since epoch):
 `conversation.getState()` / `conversation.subscribe()` returns an immutable snapshot:
 
 ```ts
-{ messages, status, error, provider, session, queued, pendingInputs }
+{ messages, status, error, provider, limited, session, queued, pendingInputs }
 ```
 
 - `status` is `idle`, `running` or `error`.
-- `provider` is the provider of the current or last turn.
+- `provider` is the provider of the current or last turn. `limited` is `true` when it couldn't use the conversation's tools (see [Tools](tools.md#an-ai-that-cant-use-tools)).
 - Each message is `{ id, role, parts, context?, metadata? }`.
 - Parts are `text`, `reasoning`, `file` (`mediaType`, a `data:` `url`, `filename`) or `tool-call` (`callId`, `name`, `args`, `state`: `running`, `awaiting-input`, `done` or `error`, then `result` or `error`).
-- `metadata` (assistant messages) holds the turn id, the provider, `startedAt`, `finishedAt` and the `outcome`.
+- `metadata` (assistant messages) holds the turn id, the provider, `startedAt`, `finishedAt`, the `outcome`, and `limited`.
 - `pendingInputs` lists the tool calls waiting for the visitor (see [Tools](tools.md#tools-the-visitor-answers)).
 
 This is the shape of assistant-ui's external store (`onNew` → `send`, `onCancel` → `stop`, `onAddToolResult` → `submitToolResult`) and of the AI SDK's `UIMessage` parts, so adapters are mappings rather than rewrites. In React, `useConversation` gives you this state (see [React](react.md)).

@@ -114,6 +114,8 @@ export interface Message {
 		startedAt: number;
 		finishedAt?: number;
 		outcome?: unknown;
+		/** The AI couldn't use the conversation's tools and answered with the page's context instead. */
+		limited?: boolean;
 	};
 }
 

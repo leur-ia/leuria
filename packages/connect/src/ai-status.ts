@@ -1,6 +1,7 @@
 import type { Leuria, ProviderSnapshot } from "@leuria/client";
 
 import { LeuriaElement } from "./element.js";
+import { limitedHere } from "./connect-button.js";
 import { statusMark } from "./icons.js";
 
 const NAMES: Record<string, string> = { bridge: "Your AI", browser: "This browser's AI", server: "This site's AI" };
@@ -52,9 +53,15 @@ export class LeuriaAIStatus extends LeuriaElement {
 
 		let tone = "idle";
 		let text = "No AI yet";
+		let hint = "";
 		if (answering) {
 			tone = "live";
 			text = this.nameOf(answering);
+			// It can't look things up on the page itself: say so, and what gives full answers.
+			if (limitedHere(answering, state?.needs)) {
+				text += " · simpler answers";
+				hint = "This AI can't look things up on this page by itself, so its answers are simpler. Connect your AI for full answers.";
+			}
 		} else if (downloading) {
 			tone = "pending";
 			const percent = downloading.progress === undefined ? "" : ` · ${Math.round(downloading.progress * 100)}%`;
@@ -63,6 +70,8 @@ export class LeuriaAIStatus extends LeuriaElement {
 			text = "Looking for your AI…";
 		}
 		this.pill.className = `status tone-${tone}`;
+		if (hint) this.pill.title = hint;
+		else this.pill.removeAttribute("title");
 		// Through Leuria: the mark wears the dot. Another AI (the browser's, the site's) keeps the plain dot.
 		this.pill.innerHTML = answering && answering.id === "bridge" ? statusMark(16, "live") : `<span class="dot" aria-hidden="true"></span>`;
 		this.pill.append(text);

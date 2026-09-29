@@ -3,11 +3,28 @@ import { type Connection, type ConnectionState, connection, type Leuria } from "
 import { LeuriaElement } from "./element.js";
 import { esc, icon, mark, statusMark } from "./icons.js";
 
-/** How an alternative is offered: in the visitor's words, never a provider's name. */
-export function insteadLabel(provider: { id: string; locality: string; label: string; status: string; action?: string }): string {
-	if (provider.id === "browser") return provider.status === "ready" ? "use this browser's AI" : "use this browser's AI (a one-time download)";
-	if (provider.locality === "site") return "use this site's AI";
-	return `use ${provider.label}`;
+/** An AI that lacks what the page's chats need (`LeuriaState.needs`): it answers with less here. */
+export function limitedHere(provider: { capabilities: readonly string[] }, needs: readonly string[] = []): boolean {
+	return needs.some((need) => !provider.capabilities.includes(need));
+}
+
+/** Another AI, in the visitor's words, never a provider's name. */
+export function otherAIName(provider: { id: string; locality: string; label: string }): string {
+	if (provider.id === "browser") return "this browser's AI";
+	if (provider.locality === "site") return "this site's AI";
+	return provider.label;
+}
+
+/** How an alternative is offered: in the visitor's words, with what it can't do here. */
+export function insteadLabel(
+	provider: { id: string; locality: string; label: string; status: string; action?: string; capabilities?: readonly string[] },
+	needs: readonly string[] = [],
+): string {
+	const notes = [
+		provider.status === "ready" ? undefined : "a one-time download",
+		limitedHere({ capabilities: provider.capabilities ?? [] }, needs) ? "simpler answers here" : undefined,
+	].filter(Boolean);
+	return `use ${otherAIName(provider)}${notes.length ? ` (${notes.join(", ")})` : ""}`;
 }
 
 /** Where visitors get Leuria. */
@@ -114,8 +131,11 @@ export class LeuriaConnectButton extends LeuriaElement {
 	protected watch(client: Leuria): () => void {
 		this.flow = connection(client);
 		const stop = this.flow.subscribe(() => this.update());
+		// The AI answering instead (the browser's, the site's) and what the page needs.
+		const stopClient = client.subscribe(() => this.update());
 		return () => {
 			stop();
+			stopClient();
 			this.flow = undefined;
 		};
 	}
@@ -182,7 +202,15 @@ export class LeuriaConnectButton extends LeuriaElement {
 		} else if (status === "declined") {
 			set("declined", `${statusMark(markSize, "blocked")}${label("Not connected")}${by("Try again")}`);
 		} else {
-			set("idle", `${mark(markSize)}${label("Connect your AI")}${this.hasAttribute("hide-byline") ? "" : by("by leuria")}`);
+			// Another AI answers for now: say which, and keep offering the visitor's own.
+			const client = this.client?.getState();
+			const other = client?.active && client.active.id !== "bridge" ? client.providers.find((p) => p.id === client.active?.id) : undefined;
+			const byline = other
+				? by(`Using ${otherAIName(other)}${limitedHere(other, client?.needs) ? " · simpler answers" : ""}`)
+				: this.hasAttribute("hide-byline")
+					? ""
+					: by("by leuria");
+			set("idle", `${mark(markSize)}${label("Connect your AI")}${byline}`);
 		}
 
 		// Secondary, small: what could answer instead, for this page, if the visitor prefers.
@@ -190,7 +218,7 @@ export class LeuriaConnectButton extends LeuriaElement {
 		this.instead.hidden = alternatives.length === 0;
 		this.instead.innerHTML = alternatives.length
 			? `<span>Or, for now:</span> ${alternatives
-					.map((p) => `<button class="link" type="button" data-action="instead" data-provider="${esc(p.id)}">${esc(insteadLabel(p))}</button>`)
+					.map((p) => `<button class="link" type="button" data-action="instead" data-provider="${esc(p.id)}">${esc(insteadLabel(p, this.client?.getState().needs))}</button>`)
 					.join(`<span aria-hidden="true">·</span>`)}`
 			: "";
 		// A connect that got no answer from Leuria: explain how to get it.

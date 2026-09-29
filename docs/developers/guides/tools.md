@@ -24,7 +24,25 @@ await ai.chat({ prompt: "Which mug is cheapest?", tools: [searchProducts] }).tex
 - `submit_result` is a reserved name (see [Structured output](structured-output.md)).
 - A conversation's tools are set when you create it. To offer other tools, start a new conversation (pass it the history with `messages`).
 
-A request with tools only goes to a provider that has the `tools` capability (see [Providers](providers.md#built-in-providers)).
+A request with tools only goes to a provider that has the `tools` capability (see [Providers](providers.md#built-in-providers)), unless it allows an AI without them.
+
+## An AI that can't use tools
+
+The browser's built-in model can't use your tools. So that it can still answer, give the conversation `withoutTools`: when no AI that can use the tools is ready, one that can't answers, and what `withoutTools` returns joins the turn's context. Hand over what the tools would have found: the passages that match the question, the product list.
+
+```ts
+const chat = ai.conversation({
+  tools: [searchNotes, readNote],
+  withoutTools: async (message) => ({
+    "Notes that may answer": await findNotes(messageText(message)),
+  }),
+})
+```
+
+- It's per conversation, and off by default. Leave it off when the tools act on the page (add to cart, fill a form): an AI without them would say it did something it didn't.
+- An AI that can use the tools is still preferred when one is ready.
+- `conversation.getState().limited` and the answer's `metadata.limited` are `true` for such turns. `ai.getState().needs` lists what the page's open conversations need (`["tools"]`), so your UI can compare it with a provider's `capabilities`. The Connect UI does it for you: it shows "simpler answers" next to that AI.
+- It works with `ai.chat()` too.
 
 ## Tool context
 

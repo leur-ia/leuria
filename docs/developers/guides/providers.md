@@ -18,7 +18,7 @@ const ai = createLeuria({
 
 Providers are tried in the order you give them. A request goes to the first one that:
 1. is `ready`;
-2. has the capabilities the request needs: `tools` when tools are given, `images` when a message has an image, and `structured` or `tools` when a schema is given;
+2. has the capabilities the request needs: `tools` when tools are given (unless the conversation has `withoutTools`), `images` when a message has an image, and `structured` or `tools` when a schema is given;
 3. passes the routing options (below).
 
 ### The visitor's own AI first
@@ -49,7 +49,7 @@ The page never needs to know which provider answered, but it can: every run star
 - `id`: default `bridge`.
 
 **`browserAI(options)`**: the browser's built-in model (`LanguageModel`, Gemini Nano in Chrome). Free and on the device, but small: good for short answers, extraction and structured output.
-- `tools`: pass page tools to the model. Default false, because browser support varies.
+- `tools`: pass page tools to the model. Default false, because browser support varies: Chrome's model accepts them but may not call them. To let it answer a conversation that has tools, use `withoutTools` (see [Tools](tools.md#an-ai-that-cant-use-tools)).
 - `languages`: e.g. `["en"]`, for the model's expected inputs and outputs.
 - `id` (default `browser`), `label`.
 

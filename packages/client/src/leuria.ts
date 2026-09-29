@@ -98,6 +98,12 @@ export interface LeuriaState {
 	 * make ready (a download). Offer them as secondary choices.
 	 */
 	alternatives: ProviderSnapshot[];
+	/**
+	 * What the page's open conversations need from an AI for full answers
+	 * (`tools`). An AI without it answers with less, or not at all: compare
+	 * with a provider's `capabilities` to say so.
+	 */
+	needs: Capability[];
 }
 
 export interface EmbedOptions {
@@ -147,7 +153,10 @@ export class Leuria {
 					}
 				}
 			},
-			onClose: (conversation) => this.conversations.delete(conversation),
+			onClose: (conversation) => {
+				this.conversations.delete(conversation);
+				this.refresh();
+			},
 		};
 		this.state = this.snapshot();
 		for (const provider of this.providers) {
@@ -297,6 +306,8 @@ export class Leuria {
 	conversation<T = unknown>(options: ConversationOptions<T> = {}): Conversation<T> {
 		const conversation = new Conversation<T>(this.select, options, this.hooks);
 		this.conversations.add(conversation as unknown as Conversation<never>);
+		// Later, not now: a conversation is often created while a UI renders.
+		if (conversation.needs.length) queueMicrotask(() => this.refresh());
 		return conversation;
 	}
 
@@ -374,6 +385,7 @@ export class Leuria {
 			embedder: embed.found ? { ...info(embed.found), model: embed.found.embedModel! } : undefined,
 			embedPending: embed.pending,
 			alternatives: providers.filter((p) => waiting.has(p.id) && (p.status === "ready" || (p.status === "needs-action" && p.action === "download"))),
+			needs: [...new Set([...(this.conversations ?? [])].flatMap((c) => c.needs))],
 		};
 	}
 }
