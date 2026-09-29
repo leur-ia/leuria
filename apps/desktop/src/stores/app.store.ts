@@ -1,11 +1,15 @@
 import type { ToastMessage } from "@leuria/pearl";
 import { createStore } from "@sinuxjs/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { type AgentModels, EngineOutdated, engine, failureText, friendlyName, onEngine, type PairingRequest, type SiteChoice, type Status } from "../engine";
 
 export type View = "loading" | "error" | "onboarding" | "home";
+
+/** "Check for updates": what the sidebar footer shows. */
+export type UpdatePhase = "idle" | "checking" | "latest" | "failed" | "ready";
 
 export interface AppState {
 	view: View;
@@ -23,9 +27,12 @@ export interface AppState {
 	starting: string;
 	/** The engine process ended: only a restart helps. */
 	stopped: boolean;
+	/** This app's version, and a newer one once it is installed and waits for a restart. */
+	appVersion: string;
+	update: { phase: UpdatePhase; version?: string };
 }
 
-const initial: AppState = { view: "loading", status: null, error: "", requests: [], toast: null, models: null, agentProblem: "", starting: "Starting Leuria…", stopped: false };
+const initial: AppState = { view: "loading", status: null, error: "", requests: [], toast: null, models: null, agentProblem: "", starting: "Starting Leuria…", stopped: false, appVersion: "", update: { phase: "idle" } };
 
 /** A start-up check is running (the visitor may skip it). */
 let checking = false;
@@ -148,6 +155,23 @@ export const appStore = createStore(initial, {
 	},
 	showToast: (_state, toast: ToastMessage) => ({ toast }),
 	dismissToast: () => ({ toast: null }),
+	/** The app's version, and an update the background check already installed. */
+	loadUpdate: async () => {
+		const [appVersion, version] = await Promise.all([getVersion().catch(() => ""), invoke<string | null>("pending_update").catch(() => null)]);
+		return version ? { appVersion, update: { phase: "ready" as UpdatePhase, version } } : { appVersion };
+	},
+	/** Look for a newer version now; one found is installed, then waits for a restart. */
+	checkUpdate: async (state) => {
+		if (state.update.phase === "checking" || state.update.phase === "ready") return {};
+		appStore.updateState({ update: { phase: "checking" as UpdatePhase } });
+		try {
+			const version = await invoke<string | null>("check_update");
+			return { update: version ? { phase: "ready" as UpdatePhase, version } : { phase: "latest" as UpdatePhase } };
+		} catch {
+			return { update: { phase: "failed" as UpdatePhase } };
+		}
+	},
+	updateReady: (_state, version: string) => ({ update: { phase: "ready" as UpdatePhase, version } }),
 	engineStopped: () => ({ view: "error" as View, stopped: true, error: "Leuria stopped working. Restart it to carry on." }),
 	/** Try again, or restart the whole app when the engine is gone. */
 	recover: async (state) => {
@@ -167,6 +191,7 @@ export function bindEngineEvents(): void {
 		void appStore.pairingSettled(requestId).then(() => appStore.refresh());
 	});
 	onEngine("engine-exit", () => void appStore.engineStopped());
+	void listen<{ version: string }>("update-ready", ({ payload }) => void appStore.updateReady(payload.version));
 	void listen<{ id: string }>("tray-model", ({ payload }) => void appStore.setModel(payload.id));
 	// A website's conversation found the default AI signed out: say so, and go back to choosing.
 	onEngine<{ id: string; ok: boolean }>("engine-agent-state", ({ id, ok }) => {

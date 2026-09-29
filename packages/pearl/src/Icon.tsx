@@ -1,7 +1,9 @@
 import {
 	ArrowRightIcon,
+	ChatBubbleLeftRightIcon,
 	CheckIcon,
 	ChevronDownIcon,
+	Cog6ToothIcon,
 	ComputerDesktopIcon,
 	EllipsisHorizontalIcon,
 	ExclamationTriangleIcon,
@@ -34,6 +36,8 @@ const ICONS = {
 	key: KeyIcon,
 	more: EllipsisHorizontalIcon,
 	plus: PlusIcon,
+	chat: ChatBubbleLeftRightIcon,
+	settings: Cog6ToothIcon,
 } satisfies Record<string, ComponentType<SVGProps<SVGSVGElement>>>;
 
 export type IconName = keyof typeof ICONS;

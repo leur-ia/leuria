@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{
     image::Image,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    tray::TrayIconBuilder,
     AppHandle, Emitter, Manager, RunEvent, WindowEvent,
 };
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -173,6 +173,12 @@ const TRAY_ICON: &[u8] = include_bytes!("../icons/tray/tray-template@2x.png");
 #[cfg(not(target_os = "macos"))]
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray/tray-white.png");
 
+/// The same mark with a download badge, while an update waits for a restart.
+#[cfg(target_os = "macos")]
+const TRAY_UPDATE_ICON: &[u8] = include_bytes!("../icons/tray/tray-update-template@2x.png");
+#[cfg(not(target_os = "macos"))]
+const TRAY_UPDATE_ICON: &[u8] = include_bytes!("../icons/tray/tray-update-white.png");
+
 /// One model in the tray's "Model" menu.
 #[derive(Deserialize, Clone)]
 struct TrayModel {
@@ -264,6 +270,17 @@ fn refresh_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Badge the tray icon so a waiting update shows without opening the menu.
+fn show_update_icon(app: &AppHandle) -> tauri::Result<()> {
+    if let Some(tray) = app.tray_by_id("main") {
+        tray.set_icon(Some(Image::from_bytes(TRAY_UPDATE_ICON)?))?;
+        // set_icon resets the template flag on macOS.
+        tray.set_icon_as_template(cfg!(target_os = "macos"))?;
+        tray.set_tooltip(Some("Leuria: a new version is ready"))?;
+    }
+    Ok(())
+}
+
 /// How often a running Leuria looks for a new version.
 const UPDATE_EVERY: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
 
@@ -276,12 +293,7 @@ fn watch_updates(app: &AppHandle) {
         tokio::time::sleep(std::time::Duration::from_secs(20)).await;
         loop {
             match install_update(&app).await {
-                Ok(Some(version)) => {
-                    app.state::<Mutex<TrayState>>().lock().unwrap().update = Some(version.clone());
-                    let _ = refresh_tray(&app);
-                    let _ = app.emit("update-ready", serde_json::json!({ "version": version }));
-                    return;
-                }
+                Ok(Some(_)) => return,
                 Ok(None) => {}
                 Err(error) => eprintln!("[update] {error}"),
             }
@@ -290,13 +302,47 @@ fn watch_updates(app: &AppHandle) {
     });
 }
 
-/// The version installed, if there was a newer one.
+/// One download at a time: the background check and "Check for updates" share it.
+static INSTALLING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// The version waiting for a restart, if any.
+fn pending(app: &AppHandle) -> Option<String> {
+    app.state::<Mutex<TrayState>>().lock().unwrap().update.clone()
+}
+
+/// The version waiting for a restart: already installed, or installed now if
+/// there is a newer one. The tray and the window hear about it.
 async fn install_update(app: &AppHandle) -> tauri_plugin_updater::Result<Option<String>> {
+    let _installing = INSTALLING.lock().await;
+    if let Some(version) = pending(app) {
+        return Ok(Some(version));
+    }
     let Some(update) = app.updater()?.check().await? else {
         return Ok(None);
     };
     update.download_and_install(|_, _| {}, || {}).await?;
-    Ok(Some(update.version))
+    let version = update.version;
+    app.state::<Mutex<TrayState>>().lock().unwrap().update = Some(version.clone());
+    let _ = refresh_tray(app);
+    let _ = show_update_icon(app);
+    let _ = app.emit("update-ready", serde_json::json!({ "version": version }));
+    Ok(Some(version))
+}
+
+/// "Check for updates" in the window: the version ready for a restart, or none.
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<Option<String>, String> {
+    // Development builds don't update themselves.
+    if cfg!(debug_assertions) {
+        return Ok(None);
+    }
+    install_update(&app).await.map_err(|e| e.to_string())
+}
+
+/// What the window shows when it opens: a version already waiting, if any.
+#[tauri::command]
+fn pending_update(app: AppHandle) -> Option<String> {
+    pending(&app)
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -306,7 +352,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("Leuria: your AI for websites")
         .menu(&menu)
-        .show_menu_on_left_click(false)
+        // Any click opens the menu; "Open Leuria" is its first item.
+        .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_main(app),
             "update" => app.restart(),
@@ -316,16 +363,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 if let Some(model) = id.strip_prefix(MODEL_PREFIX) {
                     let _ = app.emit("tray-model", serde_json::json!({ "id": model }));
                 }
-            }
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                show_main(tray.app_handle());
             }
         })
         .build(app)?;
@@ -359,7 +396,7 @@ pub fn run() {
         })
         .manage(Links(Mutex::new(Vec::new())))
         .manage(Mutex::new(TrayState::default()))
-        .invoke_handler(tauri::generate_handler![engine_info, set_tray_models, restart_app, open_link, take_links])
+        .invoke_handler(tauri::generate_handler![engine_info, set_tray_models, restart_app, open_link, take_links, check_update, pending_update])
         .setup(|app| {
             build_tray(app.handle())?;
             start_engine(app.handle())?;

@@ -1,4 +1,4 @@
-import { BridgeStatus, Icon, InkButton, Logo, PearlSurface, Toast } from "@leuria/pearl";
+import { Icon, InkButton, Logo, PearlSurface, Toast } from "@leuria/pearl";
 import { Button, Callout, Card, Flex, Spinner, Text } from "@radix-ui/themes";
 import { useStore } from "@sinuxjs/react";
 
@@ -60,15 +60,7 @@ export function App() {
 					</PearlSurface>
 				</div>
 			)}
-			{view === "home" && status && (
-				<main className="app">
-					<header className="app-header">
-						<Logo size={22} />
-						<BridgeStatus state="connected" size={1} />
-					</header>
-					<Home status={status} />
-				</main>
-			)}
+			{view === "home" && status && <Home status={status} />}
 			{request && <PairingPrompt request={request} agent={status?.agent} />}
 			<Toast message={toast} onClose={() => void appStore.dismissToast()} />
 		</>

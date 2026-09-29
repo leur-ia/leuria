@@ -1,12 +1,15 @@
 import { createStore } from "@sinuxjs/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 
-import { type AgentModels, engine, failureText, type Fit, friendlyName, type SearchChoice, type SearchModels, type SignInStatus, type Site, type TestResult, type YourAi } from "../engine";
+import { type AgentModels, engine, onEngine, failureText, type Fit, friendlyName, type SearchChoice, type SearchModels, type SignInStatus, type Site, type TestResult, type YourAi } from "../engine";
 import { appStore } from "./app.store";
 
+/** The sidebar's pages. */
+export type HomeTab = "sites" | "ais" | "settings";
+
 export interface HomeState {
-	/** Websites first (what people come for); Your AIs on their own tab. */
-	tab: "sites" | "ais";
+	/** Websites first (what people come for); Your AIs and Settings on their own pages. */
+	tab: HomeTab;
 	sites: Site[];
 	/** Your AIs, the default first: what a site can use. */
 	ais: YourAi[];
@@ -21,6 +24,8 @@ export interface HomeState {
 	aiModels: Record<string, AgentModels | null>;
 	/** Search by meaning: the models on this computer and the one sites get (null until loaded). */
 	search: SearchModels | null;
+	/** "Refresh models", per AI: running, or whether the AI answered. */
+	modelRefresh: Record<string, "running" | "done" | "stale">;
 	/** A site whose settings a `leuria://site` link asked for: shown open. */
 	focus: string | null;
 	/** How Your AIs fit each site that declared its needs (loaded when its settings open). */
@@ -38,6 +43,7 @@ const initial: HomeState = {
 	signInNeeded: null,
 	aiModels: {},
 	search: null,
+	modelRefresh: {},
 	focus: null,
 	fits: {},
 	error: "",
@@ -57,7 +63,7 @@ function message(error: unknown): string {
 }
 
 export const homeStore = createStore(initial, {
-	showTab: (_state, tab: "sites" | "ais") => ({ tab }),
+	showTab: (_state, tab: HomeTab) => ({ tab }),
 	/** A site asked (through a link, from the visitor's click) to change its AI or model: open its settings. Unknown sites are ignored. */
 	focusSite: async (_state, origin: string): Promise<Partial<HomeState>> => {
 		const sites = await engine.sites().catch(() => null);
@@ -84,6 +90,37 @@ export const homeStore = createStore(initial, {
 		if (missing.length === 0) return {};
 		const found = await Promise.all(missing.map(async (id) => [id, await engine.models(id).catch(() => null)] as const));
 		return { aiModels: { ...state.aiModels, ...Object.fromEntries(found) } };
+	},
+	/**
+	 * Ask one of Your AIs again which models it offers (a model was added,
+	 * or a plan changed). An agent is started for a moment; a service is
+	 * listed again. One that doesn't answer keeps the models it had.
+	 */
+	refreshAiModels: async (state, id: string): Promise<Partial<HomeState>> => {
+		if (state.modelRefresh[id] === "running") return {};
+		homeStore.updateState({ modelRefresh: { ...state.modelRefresh, [id]: "running" } });
+		const found = await engine.refreshModels(id).catch(() => null);
+		const now = homeStore.getState();
+		const result = found && !found.stale ? "done" : "stale";
+		if (found && !found.stale) {
+			const isDefault = now.ais.find((ai) => ai.id === id)?.default ?? id === appStore.getState().status?.agent.id;
+			// The default AI's models live in the app store (for the tray).
+			if (isDefault) await appStore.modelsLoaded(found.models);
+			else return { aiModels: { ...now.aiModels, [id]: found.models }, fits: {}, modelRefresh: { ...now.modelRefresh, [id]: result } };
+		}
+		// What fits each site may have changed with the models.
+		return { fits: {}, modelRefresh: { ...now.modelRefresh, [id]: result } };
+	},
+	/** One of Your AIs was updated in the background: show the models its new version offers (already asked by the engine). */
+	aiUpdated: async (state, id: string): Promise<Partial<HomeState>> => {
+		const models = await engine.models(id).catch(() => null);
+		if (!models) return {};
+		const isDefault = state.ais.find((ai) => ai.id === id)?.default ?? id === appStore.getState().status?.agent.id;
+		if (isDefault) {
+			await appStore.modelsLoaded(models);
+			return { fits: {} };
+		}
+		return { aiModels: { ...homeStore.getState().aiModels, [id]: models }, fits: {} };
 	},
 	/** The model one of Your AIs uses (the default AI's goes through the app store, for the tray). */
 	setAiModel: async (state, id: string, model: string) => {
@@ -205,3 +242,9 @@ export const homeStore = createStore(initial, {
 	},
 
 });
+
+/** Engine events for the home screen. Called once at startup, outside React. */
+export function bindHomeEvents(): void {
+	// A newer version of an AI was installed in the background: its models may have changed (a new one, say).
+	onEngine<{ id: string }>("engine-agent-updated", ({ id }) => void homeStore.aiUpdated(id));
+}

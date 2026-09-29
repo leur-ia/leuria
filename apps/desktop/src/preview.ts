@@ -16,6 +16,14 @@ mockIPC((cmd) => {
 	if (cmd === "plugin:autostart|is_enabled") return autostart;
 	if (cmd === "plugin:autostart|enable") autostart = true;
 	if (cmd === "plugin:autostart|disable") autostart = false;
+	if (cmd === "plugin:app|version") return "0.1.1";
+	// ?update=ready|latest|failed previews "Check for updates".
+	if (cmd === "check_update") {
+		const outcome = params.get("update");
+		return new Promise((resolve, reject) =>
+			setTimeout(() => (outcome === "failed" ? reject(new Error("offline")) : resolve(outcome === "ready" ? "0.2.0" : null)), 1500),
+		);
+	}
 	if (cmd === "plugin:event|listen") return Math.floor(Math.random() * 1e6);
 	return null;
 });
