@@ -10,14 +10,23 @@
     "directory": "packages/engine"
   },
   "homepage": "https://leuria.dev",
-  "bin": { "leuria": "./dist/cli.js" },
+  "bin": {
+    "leuria": "./dist/cli.js"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
-  "files": ["dist"],
-  "engines": { "node": ">=22" },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsx watch src/cli.ts start",
@@ -27,9 +36,14 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.5.0",
-    "ws": "^8.18.0"
+    "cacache": "^21.0.1",
+    "giget": "^3.3.1",
+    "ipaddr.js": "^2.5.0",
+    "ws": "^8.18.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@types/cacache": "^20.0.1",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.0",
     "tsup": "^8.4.0",

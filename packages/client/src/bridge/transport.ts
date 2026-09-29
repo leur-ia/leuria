@@ -100,6 +100,14 @@ export interface BridgeClientOptions {
 	app?: string;
 	/** What the site's features need: Leuria recommends an AI and model that fit. */
 	needs?: SiteNeeds;
+	/**
+	 * Skills that guide the visitor's AI on this site, in the `npx skills`
+	 * syntax: `owner/repo`, `owner/repo@skill`, `owner/repo/path#commit`, a
+	 * GitHub URL, or a path on this site (`/` for its
+	 * `.well-known/agent-skills`). Leuria fetches them, shows them to the
+	 * visitor, and gives them to the AI in this site's conversations only.
+	 */
+	skills?: string[];
 	/** Where the site's token is kept. Default: `localStorage`, else memory. */
 	storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">;
 }
@@ -177,6 +185,7 @@ export class BridgeClient {
 	readonly url: string;
 	private readonly app?: string;
 	private readonly needs?: SiteNeeds;
+	private readonly skills?: string[];
 	private readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem">;
 	private readonly tokenKey: string;
 
@@ -184,6 +193,7 @@ export class BridgeClient {
 		this.url = (options.url ?? DEFAULT_URL).replace(/\/+$/, "");
 		this.app = options.app;
 		this.needs = options.needs;
+		this.skills = options.skills;
 		this.storage = options.storage ?? defaultStorage();
 		this.tokenKey = `leuria:token:${this.url}`;
 	}
@@ -232,6 +242,7 @@ export class BridgeClient {
 		const origin = typeof location === "undefined" ? undefined : location.origin;
 		if (options.openLink !== false && origin) {
 			const query = new URLSearchParams({ origin, nonce, ...(this.app ? { app: this.app } : {}), ...needsQuery(this.needs) });
+			for (const skill of this.skills ?? []) query.append("skill", skill);
 			(options.openLink ?? followLink)(`leuria://connect?${query}`);
 		}
 		const started = Date.now();
@@ -245,7 +256,7 @@ export class BridgeClient {
 			const res = await fetch(`${this.url}/connect/claim`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ nonce, app: this.app, needs: this.needs }),
+				body: JSON.stringify({ nonce, app: this.app, needs: this.needs, skills: this.skills }),
 				signal: options.signal,
 			}).catch(() => null);
 			if (!res || res.status === 404) {
@@ -298,6 +309,8 @@ export class BridgeClient {
 				attachments: options.attachments,
 				systemPrompt: options.systemPrompt,
 				maxTurns: options.maxTurns,
+				// The site's current list: Leuria picks up skills it added or removed.
+				...(this.skills ? { skills: this.skills } : {}),
 			},
 		);
 		const session = new BridgeSession(this, prepared.sessionId);

@@ -29,6 +29,14 @@ describe("what a site says it needs, and its settings link", () => {
 		expect(parseConnectLink("leuria://connect?origin=https://a.example&nonce=n&effort=huge")).not.toHaveProperty("needs");
 	});
 
+	it("reads the skills the site names", () => {
+		const skill = (ref: string) => `skill=${encodeURIComponent(ref)}`;
+		expect(parseConnectLink(`leuria://connect?origin=https://a.example&nonce=n&${skill("/")}&${skill("owner/repo@returns")}`)).toMatchObject({
+			skills: ["/", "owner/repo@returns"],
+		});
+		expect(parseConnectLink("leuria://connect?origin=https://a.example&nonce=n")).not.toHaveProperty("skills");
+	});
+
 	it("reads a site's settings link", () => {
 		expect(parseSiteLink(`leuria://site?origin=${encodeURIComponent("https://shop.example")}`)).toEqual({ origin: "https://shop.example" });
 		expect(parseSiteLink("leuria://connect?origin=https://shop.example")).toBeNull();

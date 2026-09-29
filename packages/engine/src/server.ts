@@ -28,6 +28,7 @@ import type { Logger } from "./logger.js";
 import { Pairing, type PairingRequestInfo } from "./pairing.js";
 import { handleSessionRequest } from "./routes.js";
 import { type AgentLaunch, SessionManager, type SessionManagerOptions } from "./session-manager.js";
+import { SkillService } from "./skills.js";
 import { VERSION } from "./version.js";
 import { WebMcpServer } from "./webmcp-server.js";
 
@@ -74,6 +75,8 @@ export interface EngineOptions {
 	onAgentState?: SessionManagerOptions["onAgentState"];
 	/** Embeddings for connected sites. Default: an embedding model in LM Studio or Ollama on this computer. */
 	embeddings?: Embeddings;
+	/** The skills sites give their AI. Default: fetched from GitHub or the site, cached in `~/.leuria/skills`. */
+	skills?: SkillService;
 }
 
 export interface EngineHandle {
@@ -101,12 +104,14 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 	const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 	const silent = options.silent ?? Boolean(options.admin);
 
+	const skills = options.skills ?? new SkillService({ grants, logger });
 	const webMcpServer = new WebMcpServer(logger, port);
 	const sessions = new SessionManager({
 		webMcpServer,
 		port,
 		logger,
 		resolveAgent: options.resolveAgent,
+		loadSkills: (origin) => skills.forSession(origin),
 		startTimeoutMs: options.startTimeoutMs,
 		stdioMcpCommand: options.stdioMcpCommand,
 		onAgentState: options.onAgentState,
@@ -122,6 +127,7 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 		port,
 		linksOnly: silent,
 		agentName: () => agentName(),
+		resolveSkills: (origin, refs) => skills.resolve(origin, refs),
 		onRequest: options.onPairingRequest,
 		onDecided: options.onPairingDecided,
 	});
@@ -268,7 +274,8 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 				return;
 			}
 			const requester = caller.kind === "site" ? caller.origin : "local";
-			if (await handleSessionRequest(req, res, pathname, sessions, requester)) return;
+			const onSkills = caller.kind === "site" ? (origin: string, refs: string[] | undefined) => skills.refresh(origin, refs) : undefined;
+			if (await handleSessionRequest(req, res, pathname, sessions, requester, onSkills)) return;
 			sendJson(res, 404, { error: "Not found" });
 		} catch (err) {
 			logger.error("request failed", {

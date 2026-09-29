@@ -128,9 +128,9 @@ Pairing gives a page a grant: a token that works only for its origin. It starts 
 
 | Step | Who | What |
 | --- | --- | --- |
-| 1. Link | The page, in the click handler | Make a secret `nonce` (16 to 96 random bytes, base64url), then open `leuria://connect?origin=<page origin>&app=<name>&nonce=<nonce>`, plus the site's needs if it declares them (`&tools=1&images=1&effort=light&context=8000`). The system hands the link to the Leuria app, and starts it if needed |
-| 2. Ask | The app | Registers the link with the engine (`POST /admin/pairing/link { origin, app?, nonce, needs? }`, admin token) and asks the visitor in its own window. From now on, the engine answers this origin |
-| 3. Claim | The page | `POST /connect/claim { nonce, app?, needs? }`, long-polled for up to 25 s; call it again after `pending` |
+| 1. Link | The page, in the click handler | Make a secret `nonce` (16 to 96 random bytes, base64url), then open `leuria://connect?origin=<page origin>&app=<name>&nonce=<nonce>`, plus the site's needs if it declares them (`&tools=1&images=1&effort=light&context=8000`) and one `&skill=<ref>` per skill it uses. The system hands the link to the Leuria app, and starts it if needed |
+| 2. Ask | The app | Registers the link with the engine (`POST /admin/pairing/link { origin, app?, nonce, needs?, skills? }`, admin token) and asks the visitor in its own window. From now on, the engine answers this origin |
+| 3. Claim | The page | `POST /connect/claim { nonce, app?, needs?, skills? }`, long-polled for up to 25 s; call it again after `pending` |
 | 4. Answer | The engine | `200 { status: "pending" }`, `{ status: "denied" }`, or `{ status: "allowed", token }` |
 
 - **Before the link arrives**, the claim gets no readable answer (the engine is silent to this origin). Keep claiming for a few seconds: the app may be starting. A page that never gets an answer should say that Leuria isn't running, or isn't installed.
@@ -140,6 +140,7 @@ Pairing gives a page a grant: a token that works only for its origin. It starts 
 - The token is returned once. The request is then forgotten.
 - The engine stores only the token's SHA-256, in `~/.leuria/grants.json`. Pairing again replaces the token. The site keeps its AI and model choice.
 - **Needs** are a closed vocabulary: `tools` and `images` (flags), `effort` (`light`, `standard` or `deep`) and `context` (tokens). Unknown keys and values are dropped. They are guidance for the visitor's choice of AI and model, stored with the grant, and never change what the site may do.
+- **Skills** are refs in the `npx skills` syntax (see the [Skills guide](guides/skills.md)): up to 16 strings of at most 300 characters. The engine fetches them while the visitor looks at the question, shows them there, and stores them with the grant.
 - A request expires after 5 minutes. At most 20 can be pending at once, across all sites. `app` is cut to 80 characters.
 - The visitor can revoke a grant at any time (`leuria sites revoke <origin>`, or the desktop app). This ends the origin's sessions, and its token stops working.
 
@@ -153,7 +154,7 @@ A session is one running AI for one page, with that page's tools.
 
 | Method and path | Body | Response |
 | --- | --- | --- |
-| `POST /session/prepare` | `{ prompt?, attachments?, systemPrompt?, maxTurns? }` | `201 { sessionId, status: "pending_approval", registrationToken, webmcpUrl }` |
+| `POST /session/prepare` | `{ prompt?, attachments?, systemPrompt?, maxTurns?, skills? }` | `201 { sessionId, status: "pending_approval", registrationToken, webmcpUrl }` |
 | `GET /session/:id/stream` | | Server-sent events, see [Stream events](#stream-events) |
 | `POST /session/:id/approve` | | Starts the AI and sends `prompt`, if any. Without a prompt the session goes `idle` and emits `ready` (a warm start) |
 | `POST /session/:id/prompt` | `{ prompt, attachments? }` | A follow-up turn on an `idle` session |
@@ -170,6 +171,7 @@ The `POST` actions answer `200 { sessionId, status }`. An action the current sta
 - The page cannot choose the AI. The visitor sets a default (`leuria --agent`, or the desktop app), and may pick another AI or model per site (`leuria sites use`). When the visitor changes a site's AI or model, the engine cancels that site's sessions, and the next session uses the new choice.
 - `prompt`, when given, must be a non-empty string.
 - `systemPrompt` replaces the agent's coding-assistant preset.
+- `skills`, when present, is the site's current list of skill refs. When it differs from the grant's, the engine fetches it in the background for the next sessions; `[]` removes them, and leaving it out changes nothing. A session gets the grant's skills: their names and descriptions after `systemPrompt`, and a `read_skill` tool.
 - `maxTurns` caps the AI's steps per turn. It is clamped between 1 and 50.
 - The AI must start within 60 s, or the session fails.
 - An ended session stays readable (`GET`, `stream`) for 5 minutes, then answers `404`.
@@ -275,7 +277,7 @@ The page's tools run in the page. The engine relays the AI's calls to them over 
 - A `result` that is a string reaches the AI as it is. Anything else reaches it as JSON text. An `error` reaches it as a failed tool call.
 - A call that arrives while no channel is connected fails at once, so keep the channel open for the whole session.
 
-**The AI's side.** The agent reaches the same tools at `POST /webmcp/mcp`: MCP over streamable HTTP, with `Authorization: Bearer <channel token>`, as the MCP server `webmcp`. Claude sees them as `mcp__webmcp__<name>`. Pages can't call this endpoint (`403`). Models run by the engine's own tool loop (LM Studio, Ollama, OpenAI-compatible APIs) get the same tools in-process.
+**The AI's side.** The agent reaches the same tools at `POST /webmcp/mcp`: MCP over streamable HTTP, with `Authorization: Bearer <channel token>`, as the MCP server `webmcp`. Claude sees them as `mcp__webmcp__<name>`. Pages can't call this endpoint (`403`). Models run by the engine's own tool loop (LM Studio, Ollama, OpenAI-compatible APIs) get the same tools in-process. When the site has skills, the engine adds its own `read_skill` tool (`{ name, file? }`) to the list and answers it itself; the page never sees these calls.
 
 ## Embeddings
 

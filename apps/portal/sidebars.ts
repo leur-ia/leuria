@@ -12,6 +12,7 @@ const sidebars: SidebarsConfig = {
 				"developers/guides/providers",
 				"developers/guides/conversations",
 				"developers/guides/tools",
+				"developers/guides/skills",
 				"developers/guides/structured-output",
 				"developers/guides/embeddings",
 				"developers/guides/connect-ui",

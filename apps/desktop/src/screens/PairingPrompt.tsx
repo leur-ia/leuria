@@ -4,6 +4,7 @@ import { useStore } from "@sinuxjs/react";
 import { useEffect, useState } from "react";
 
 import { AiChoiceCard } from "../components/AiChoiceCard";
+import { SiteSkills } from "../components/SiteSkills";
 import { friendlyName, type PairingRequest, type Status } from "../engine";
 import { costWords, needsSentence, verdictOf, verdictWords } from "../fit-words";
 import { appStore } from "../stores/app.store";
@@ -182,6 +183,7 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 							</ul>
 						</Flex>
 					</Flex>
+					{request.skills && <SiteSkills list={request.skills.list} loading={request.skills.loading} />}
 					{insecure && (
 						<Callout.Root color="amber" size="1">
 							<Callout.Icon>

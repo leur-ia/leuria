@@ -29,7 +29,8 @@ export function parseConnectLink(raw: string): ConnectLink | null {
 	if (effort === "light" || effort === "standard" || effort === "deep") needs.effort = effort;
 	const context = Number(params.get("context"));
 	if (context > 0) needs.context = context;
-	return { origin, nonce, ...(app ? { app } : {}), ...(Object.keys(needs).length ? { needs } : {}) };
+	const skills = params.getAll("skill");
+	return { origin, nonce, ...(app ? { app } : {}), ...(Object.keys(needs).length ? { needs } : {}), ...(skills.length ? { skills } : {}) };
 }
 
 /** `leuria://site?origin=…`: the visitor wants to change a connected site's AI or model. */

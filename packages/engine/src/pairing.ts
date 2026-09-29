@@ -29,6 +29,7 @@ import { type GrantStore, normalizeOrigin } from "./grants.js";
 import { parseBody, sendJson } from "./http-utils.js";
 import type { Logger } from "./logger.js";
 import { parseNeeds, type SiteNeeds } from "./needs.js";
+import { parseSkillRefs, sameRefs, type SiteSkill } from "./skills.js";
 
 const REQUEST_TTL_MS = 5 * 60_000;
 const MAX_PENDING = 20;
@@ -51,6 +52,8 @@ interface PendingRequest {
 	nonce: Buffer;
 	/** What the site says its features need. */
 	needs?: SiteNeeds;
+	/** The skills the site gives its AI: its refs, and what they resolved to once fetched. */
+	skills?: { refs: string[]; list?: SiteSkill[] };
 	token?: string;
 	waiters: Set<() => void>;
 }
@@ -68,7 +71,9 @@ export interface PairingOptions {
 	linksOnly: boolean;
 	/** Plain-language name of the configured agent, shown on the page. */
 	agentName: () => string;
-	/** Called when a request is created (or a link repeated), e.g. to open the approval page or show the app. */
+	/** Fetch the skills a site names, to show them before the visitor answers. Without it, skills are ignored. */
+	resolveSkills?: (origin: string, refs: string[]) => Promise<SiteSkill[]>;
+	/** Called when a request is created (or a link repeated, or its skills are fetched), e.g. to open the approval page or show the app. */
 	onRequest?: (request: PairingRequestInfo) => void;
 	/** Called when the visitor decided, wherever they clicked. */
 	onDecided?: (request: { requestId: string; origin: string; allowed: boolean }) => void;
@@ -79,6 +84,8 @@ export interface PairingRequestInfo {
 	origin: string;
 	app?: string;
 	needs?: SiteNeeds;
+	/** The skills the site gives its AI; `loading` until they are fetched. */
+	skills?: { loading: boolean; list: Array<Pick<SiteSkill, "name" | "description" | "source" | "shared">> };
 	approveUrl: string;
 }
 
@@ -101,7 +108,7 @@ export class Pairing {
 	 * or why it was refused. A repeated link for the same site replaces the
 	 * nonce (the page tried again) instead of asking twice.
 	 */
-	link(input: { origin?: unknown; app?: unknown; nonce?: unknown; needs?: unknown }): { requestId: string } | { error: string } {
+	link(input: { origin?: unknown; app?: unknown; nonce?: unknown; needs?: unknown; skills?: unknown }): { requestId: string } | { error: string } {
 		this.expire();
 		let origin: string;
 		try {
@@ -112,7 +119,7 @@ export class Pairing {
 		if (this.options.selfOrigins.has(origin)) return { error: "The link doesn't name a website." };
 		if (typeof input.nonce !== "string" || !NONCE.test(input.nonce)) return { error: "The link is incomplete." };
 		const app = typeof input.app === "string" && input.app.trim() ? input.app.trim().slice(0, 80) : undefined;
-		const request = this.open(origin, app, input.nonce, parseNeeds(input.needs));
+		const request = this.open(origin, app, input.nonce, parseNeeds(input.needs), parseSkillRefs(input.skills));
 		return "error" in request ? request : { requestId: request.id };
 	}
 
@@ -144,7 +151,7 @@ export class Pairing {
 				sendJson(res, 403, { error: "Forbidden" });
 				return true;
 			}
-			sendJson(res, 200, { decision: request?.decision ?? "expired" });
+			sendJson(res, 200, { decision: request?.decision ?? "expired", ...(request?.skills && !request.skills.list ? { skillsLoading: true } : {}) });
 			return true;
 		}
 		if (req.method === "POST" && action === "decide") {
@@ -192,7 +199,7 @@ export class Pairing {
 			}
 			// The CLI: the claim itself asks the visitor.
 			const app = typeof body.app === "string" && body.app.trim() ? body.app.trim().slice(0, 80) : undefined;
-			const opened = this.open(origin, app, nonce, parseNeeds(body.needs));
+			const opened = this.open(origin, app, nonce, parseNeeds(body.needs), parseSkillRefs(body.skills));
 			if ("error" in opened) {
 				sendJson(res, opened.status, { error: opened.error });
 				return;
@@ -220,7 +227,7 @@ export class Pairing {
 	}
 
 	/** Ask the visitor about `origin`, or update the question already asked. */
-	private open(origin: string, app: string | undefined, nonce: string, needs?: SiteNeeds): PendingRequest | { error: string; status: number } {
+	private open(origin: string, app: string | undefined, nonce: string, needs?: SiteNeeds, skillRefs?: string[]): PendingRequest | { error: string; status: number } {
 		const denied = this.deniedAt.get(origin);
 		if (denied && Date.now() - denied < DENIED_COOLDOWN_MS) return { error: "The visitor just said no to this site", status: 429 };
 		const existing = [...this.requests.values()].find((r) => r.origin === origin && r.decision === "pending");
@@ -228,6 +235,7 @@ export class Pairing {
 			existing.nonce = hashNonce(nonce);
 			if (app) existing.app = app;
 			if (needs) existing.needs = needs;
+			if (skillRefs && !sameRefs(existing.skills?.refs, skillRefs)) this.fetchSkills(existing, skillRefs);
 			this.options.onRequest?.(this.info(existing));
 			return existing;
 		}
@@ -245,17 +253,42 @@ export class Pairing {
 			waiters: new Set(),
 		};
 		this.requests.set(request.id, request);
+		if (skillRefs) this.fetchSkills(request, skillRefs);
 		this.options.logger.info("pairing requested", { origin, app });
 		this.options.onRequest?.(this.info(request));
 		return request;
 	}
 
+	/**
+	 * Fetch the skills the site names, then show them: the question is asked
+	 * again with them. Answered meanwhile: they go to the site's grant.
+	 */
+	private fetchSkills(request: PendingRequest, refs: string[]): void {
+		const { resolveSkills } = this.options;
+		if (!resolveSkills) return;
+		const skills: NonNullable<PendingRequest["skills"]> = { refs };
+		request.skills = skills;
+		void resolveSkills(request.origin, refs)
+			.catch(() => [])
+			.then((list) => {
+				// The site asked again with other skills meanwhile.
+				if (request.skills !== skills) return;
+				skills.list = list;
+				if (request.decision === "pending") this.options.onRequest?.(this.info(request));
+				else if (request.decision === "allowed") this.options.grants.setSkills(request.origin, { refs, list });
+			});
+	}
+
 	private info(request: PendingRequest): PairingRequestInfo {
+		const skills = request.skills;
 		return {
 			requestId: request.id,
 			origin: request.origin,
 			app: request.app,
 			...(request.needs ? { needs: request.needs } : {}),
+			...(skills
+				? { skills: { loading: !skills.list, list: (skills.list ?? []).map(({ name, description, source, shared }) => ({ name, description, source, shared })) } }
+				: {}),
 			approveUrl: `http://127.0.0.1:${this.options.port}/connect/${request.id}`,
 		};
 	}
@@ -281,7 +314,8 @@ export class Pairing {
 
 	private decide(request: PendingRequest, allow: boolean, granted?: (origin: string) => void): void {
 		if (allow) {
-			request.token = this.options.grants.create(request.origin, request.app, request.needs);
+			const skills = request.skills ? { refs: request.skills.refs, list: request.skills.list ?? [] } : undefined;
+			request.token = this.options.grants.create(request.origin, request.app, request.needs, skills);
 			granted?.(request.origin);
 			request.decision = "allowed";
 		} else {
@@ -380,6 +414,15 @@ button.ink:hover { background: var(--ink-hover); }
 button:disabled { opacity: 0.5; cursor: default; }
 button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .small { font-size: 12px; }
+.skills { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.skills summary { cursor: pointer; display: flex; justify-content: space-between; gap: 8px; list-style: none; }
+.skills summary::-webkit-details-marker { display: none; }
+.skills summary span:last-child { color: var(--muted); white-space: nowrap; }
+.skills[open] summary span:last-child::after { content: " \\25B4"; }
+.skills:not([open]) summary span:last-child::after { content: " \\25BE"; }
+.skills ul { margin-top: 10px; gap: 10px; }
+.skills li { display: block; }
+.skills li p { font-size: 13px; }
 `;
 
 const MARK = "M181 61 C184 74 191 82 206 86 C191 90 184 98 181 111 C178 98 171 90 156 86 C171 82 178 74 181 61 Z M59 92 C60 109 67 128 79 143 C91 158 105 168 124 174 C149 182 164 193 171 207 C177 219 177 239 177 255 C182 255 182 240 184 226 C188 199 201 187 223 179 C247 171 270 158 284 142 C298 127 303 109 303 92 C298 91 292 101 284 108 C265 125 245 130 226 126 C217 124 211 114 205 112 C199 110 199 116 199 121 C198 127 191 130 181 130 C171 130 165 127 163 121 C162 116 165 110 159 111 C151 112 148 122 137 126 C118 131 98 125 78 109 C69 102 65 91 59 92 Z";
@@ -408,6 +451,7 @@ function approvePage(request: PendingRequest, agentName: string): string {
 <p>It will talk to ${agent}, on this computer.</p>
 <div><div class="eyebrow">It can</div><ul class="can"><li>${CHECK}Ask your AI to answer you</li><li>${CHECK}Let your AI use its own page's tools</li></ul></div>
 <div><div class="eyebrow">It can't</div><ul class="cant"><li>${CROSS}See your files or run programs</li><li>${CROSS}See what you do on other websites</li></ul></div>
+${skillsSection(request)}
 ${insecure ? `<p class="warn">This site doesn't use a secure connection.</p>` : ""}
 <p class="small">You can disconnect it at any time with <code>leuria sites revoke ${escapeHtml(request.origin)}</code>.</p>
 <div class="actions"><button type="button" class="soft" id="deny">Not now</button><button type="button" class="ink" id="allow">Allow</button></div>`;
@@ -428,13 +472,28 @@ async function decide(allow) {
 }
 document.getElementById("allow").addEventListener("click", () => decide(true));
 document.getElementById("deny").addEventListener("click", () => decide(false));
-// Answered in the Leuria app instead: close this window too.
+// Answered in the Leuria app instead: close this window too. The site's skills fetched: show them.
+const skillsLoading = ${request.skills && !request.skills.list ? "true" : "false"};
 setInterval(async () => {
   const res = await fetch(location.pathname + "/state").catch(() => null);
   const state = res && res.ok ? await res.json() : null;
   if (state && state.decision !== "pending") done("Answered in Leuria", "You can close this window.");
+  else if (state && skillsLoading && !state.skillsLoading) location.reload();
 }, 1500);`;
 	return page("Connect your AI", body, script);
+}
+
+/** "This site uses 2 skills to guide your AI", with the list under "See details". */
+function skillsSection(request: PendingRequest): string {
+	const skills = request.skills;
+	if (!skills) return "";
+	if (!skills.list) return `<p>Checking the skills this site uses to guide your AI…</p>`;
+	if (!skills.list.length) return "";
+	const count = skills.list.length === 1 ? "1 skill" : `${skills.list.length} skills`;
+	const items = skills.list
+		.map((s) => `<li><strong>${escapeHtml(s.name)}</strong><p>${escapeHtml(s.description)}</p><p class="small">${s.shared ? `Shared skill · ${escapeHtml(s.source)}` : `From ${escapeHtml(s.source)}`}</p></li>`)
+		.join("");
+	return `<details class="skills"><summary><span>This site uses ${count} to guide your AI.</span><span>See details</span></summary><ul>${items}</ul></details>`;
 }
 
 function messagePage(title: string, text: string): string {

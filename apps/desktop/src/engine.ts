@@ -54,6 +54,8 @@ export interface Site {
 	model?: { agent: string; id: string };
 	/** What the site said its features need. */
 	needs?: SiteNeeds;
+	/** The skills the site gives its AI. */
+	skills?: { list: SkillInfo[] };
 }
 
 export interface PairingRequest {
@@ -61,6 +63,20 @@ export interface PairingRequest {
 	origin: string;
 	app?: string;
 	needs?: SiteNeeds;
+	/** The skills the site gives its AI; `loading` while Leuria fetches them. */
+	skills?: { loading: boolean; list: SkillInfo[] };
+}
+
+/** A skill a site gives its AI: instructions for tasks on that site. */
+export interface SkillInfo {
+	name: string;
+	description: string;
+	/** The site's host, or the public repository it is shared from. */
+	source: string;
+	/** Shared from a public repository, rather than written by the site. */
+	shared: boolean;
+	/** The site added it after it was connected. */
+	addedAt?: string;
 }
 
 /** What a site says its features need (guidance for choosing its AI). */
@@ -139,6 +155,8 @@ export interface ConnectLink {
 	app?: string;
 	nonce: string;
 	needs?: SiteNeeds;
+	/** The skills the site names, as the page wrote them: the engine checks and fetches them. */
+	skills?: string[];
 }
 
 let ready: Promise<{ base: string; token: string }> | null = null;
@@ -200,6 +218,9 @@ export const engine = {
 	/** Models an AI offers (the default AI's without `agent`); null when it offers no choice. */
 	models: (agent?: string) =>
 		call<{ agent: string; models: AgentModels | null }>("GET", `/models${agent ? `?agent=${encodeURIComponent(agent)}` : ""}`).then((r) => r.models),
+	/** Ask an AI again which models it offers (starts an agent for a moment). `stale`: it didn't answer, so these are the ones it last listed. */
+	refreshModels: (agent: string) =>
+		call<{ agent: string; models: AgentModels | null; stale?: boolean }>("GET", `/models?agent=${encodeURIComponent(agent)}&refresh=1`),
 	/** Use another model for one site (`null`: its AI's own choice). */
 	setSiteModel: (origin: string, model: string | null) => call<{ ok: boolean }>("POST", "/sites/model", { origin, model }),
 	/** The model to use with an agent (`null`: the agent's default). Applies to the next conversations. */

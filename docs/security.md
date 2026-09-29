@@ -19,6 +19,9 @@ This is the working threat model. Every website is untrusted until the visitor a
 | A site reads another site's sessions | Sessions are keyed by origin; other origins get `404` | `routes.ts` |
 | A site spawns agents in a loop | At most 4 live sessions per origin | `session-manager.ts` |
 | Token theft from disk | Only SHA-256 hashes are stored, in files readable by the user only | `grants.ts`, `home.ts` |
+| A site points the engine at the visitor's network through its skills | Skill refs are fetched only from GitHub (through its API) or the site's own origin. A site on the internet whose name resolves to a loopback, private or other non-public address is refused; redirects are refused. Downloads are size- and time-capped | `skill-sources.ts` |
+| A site's skills run code | Only text files are kept; scripts and binaries are dropped. Skills reach the agent as text through `read_skill`, and the agent still has only the page's tools | `skill-sources.ts`, `skills.ts` |
+| A site's skills reach another site | Each grant keeps its own list; a session gets only its origin's skills. The cache is shared by content, but only the grant says which entries a site may use | `skills.ts` |
 | Adapter supply chain | The adapter version is pinned and installed into `~/.leuria/agents`, not fetched with `npx` on each session | `agents.ts` |
 
 `leuria test` checks each agent against the policy with the real model. It asks the agent to list and read files in the home folder "with any tool you have". The test fails if any tool other than a page tool runs, or if the answer contains entries of the real home folder.
@@ -29,6 +32,7 @@ This is the working threat model. Every website is untrusted until the visitor a
 
 - **Fingerprinting with the CLI.** The CLI engine (`npx @leuria/cli`, for developers) can't receive `leuria://` links, so it answers every origin's claim, and a site can tell it runs. The desktop app, which visitors use, is silent.
 - **Timing and port probes.** A page can still time a request to the loopback port. Chrome's local network access permission, which asks the visitor, now stands in front of that; the SDK makes no such request before the visitor clicks Connect.
+- **Skills from a branch.** A ref without a commit follows the branch as it was when Leuria fetched it; whoever controls that repository controls what the site tells the AI. The guide says to pin shared skills to a commit. DNS is checked before fetching a site's skills, not at connection time, so a fast DNS rebind remains possible (a page in the browser has the same reach).
 - **Spending.** There are no per-site rate limits or spending caps yet, and no audit log beyond `-v` output.
 - **Plain HTTP sites.** They can pair. The approval page warns when a non-local site doesn't use HTTPS, but on such a site the token can be read by anyone on the network path.
 - **Agent environment.** The agent inherits the visitor's environment variables. It can't run tools, but it could print a variable in its answer if a site's prompt asked for it. To do: pass an allow-list of environment variables.

@@ -1,7 +1,7 @@
 /**
  * `/session/*` HTTP surface.
  *
- *   POST /session/prepare           { prompt?, attachments?, systemPrompt?, maxTurns? }
+ *   POST /session/prepare           { prompt?, attachments?, systemPrompt?, maxTurns?, skills? }
  *   POST /session/:id/approve
  *   POST /session/:id/prompt        { prompt, attachments? }
  *   POST /session/:id/cancel-turn
@@ -19,6 +19,7 @@ import type * as http from "node:http";
 import type { PromptAttachment } from "./acp/acp-client.js";
 import { parseBody, sendJson, writeSse } from "./http-utils.js";
 import type { SessionManager } from "./session-manager.js";
+import { parseSkillRefs } from "./skills.js";
 
 const MAX_ATTACHMENTS = 10;
 
@@ -57,13 +58,15 @@ export async function handleSessionRequest(
 	sm: SessionManager,
 	/** Authenticated origin, or `local` for requests without `Origin`. */
 	requester: string,
+	/** The site sent its skill refs with a session: update them when they changed. */
+	onSkills?: (origin: string, refs: string[] | undefined) => void,
 ): Promise<boolean> {
 	const segments = pathname.split("/").filter(Boolean);
 	if (segments[0] !== "session") return false;
 
 	try {
 		if (req.method === "POST" && segments.length === 2 && segments[1] === "prepare") {
-			await handlePrepare(req, res, sm, requester);
+			await handlePrepare(req, res, sm, requester, onSkills);
 			return true;
 		}
 		const sessionId = segments[1];
@@ -127,8 +130,11 @@ async function handlePrepare(
 	res: http.ServerResponse,
 	sm: SessionManager,
 	origin: string,
+	onSkills?: (origin: string, refs: string[] | undefined) => void,
 ): Promise<void> {
 	const body = (await parseBody(req)) as Record<string, unknown>;
+	// Only a page that says which skills it uses changes them: `[]` removes them all.
+	if ("skills" in body) onSkills?.(origin, parseSkillRefs(body.skills));
 	if (body.prompt !== undefined && (typeof body.prompt !== "string" || !body.prompt.trim())) {
 		sendJson(res, 400, { error: "prompt must be a non-empty string when given" });
 		return;

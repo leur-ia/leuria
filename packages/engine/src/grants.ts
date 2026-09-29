@@ -9,6 +9,7 @@ import { statSync } from "node:fs";
 
 import { homePath, readJson, writeJson } from "./home.js";
 import type { SiteNeeds } from "./needs.js";
+import type { SiteSkills } from "./skills.js";
 
 export interface Grant {
 	origin: string;
@@ -23,6 +24,8 @@ export interface Grant {
 	model?: { agent: string; id: string };
 	/** What the site said its features need, when it connected (guidance for choosing its AI). */
 	needs?: SiteNeeds;
+	/** The skills the site gives its AI: the refs it declared and what they resolved to. */
+	skills?: SiteSkills;
 }
 
 export class GrantStore {
@@ -90,8 +93,19 @@ export class GrantStore {
 		return true;
 	}
 
-	/** Create or replace the origin's grant; returns the new token. Keeps the site's AI and model choice; `needs` replaces what it declared. */
-	create(origin: string, app?: string, needs?: SiteNeeds): string {
+	/** Replace the site's skills (it changed its list). Its open conversations keep the skills they started with. */
+	setSkills(origin: string, skills: SiteSkills | undefined): boolean {
+		this.reload();
+		const grant = this.grants.find((g) => g.origin === normalizeOrigin(origin));
+		if (!grant) return false;
+		if (skills) grant.skills = skills;
+		else delete grant.skills;
+		this.save();
+		return true;
+	}
+
+	/** Create or replace the origin's grant; returns the new token. Keeps the site's AI and model choice; `needs` and `skills` replace what it declared. */
+	create(origin: string, app?: string, needs?: SiteNeeds, skills?: SiteSkills): string {
 		this.reload();
 		const normalized = normalizeOrigin(origin);
 		const token = randomBytes(32).toString("base64url");
@@ -105,6 +119,7 @@ export class GrantStore {
 			...(previous?.agent ? { agent: previous.agent } : {}),
 			...(previous?.model ? { model: previous.model } : {}),
 			...(needs ? { needs } : {}),
+			...(skills ? { skills } : {}),
 		});
 		this.save();
 		return token;

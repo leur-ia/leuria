@@ -39,6 +39,7 @@ for await (const event of convo.send("Which mug is cheapest?")) {
 | [Providers and the cascade](guides/providers.md) | The built-in providers, how one is picked, routing, `NoProviderError`, the client's state, connecting |
 | [Conversations and turns](guides/conversations.md) | `ai.chat()` and `ai.conversation()`, turn context, queue, timeouts, warm sessions, events, attachments, the conversation's state |
 | [Page tools](guides/tools.md) | `defineTool`, tool context, terminal tools, tools the visitor answers, middleware, WebMCP |
+| [Skills](guides/skills.md) | Instructions for the visitor's AI on your site, from your origin or shared on GitHub |
 | [Structured output](guides/structured-output.md) | A JSON Schema in, a parsed and validated object out, from any provider |
 | [Embeddings and search by meaning](guides/embeddings.md) | `ai.embed()`, `@leuria/store` and a model in the page with `@leuria/web-embed` |
 | [Connect UI](guides/connect-ui.md) | The connect flow, and Leuria's elements for any page or for React |

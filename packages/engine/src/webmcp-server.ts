@@ -27,6 +27,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer } from "ws";
 
+import { READ_SKILL, readSkill, readSkillTool, type SkillContent } from "./skills.js";
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -84,6 +86,8 @@ interface WebMcpChannel {
 	tools: Map<string, ToolDescriptor>;
 	resources: Map<string, ResourceDescriptor>;
 	prompts: Map<string, PromptDescriptor>;
+	/** The site's skills, served by the engine itself as `read_skill`. */
+	skills: SkillContent[];
 	pendingRequests: Map<string, PendingRequest>;
 	pingTimer: ReturnType<typeof setInterval> | null;
 }
@@ -173,6 +177,7 @@ export class WebMcpServer {
 			tools: new Map(),
 			resources: new Map(),
 			prompts: new Map(),
+			skills: [],
 			pendingRequests: new Map(),
 			pingTimer: null,
 		};
@@ -302,20 +307,35 @@ export class WebMcpServer {
 
 	// ── In-process access (the engine's own agent loop for LLM providers) ──
 
-	/** The page tools a session's browser has declared. */
+	/** Give a session its site's skills: the agent then also gets `read_skill`. */
+	setSkills(sessionId: string, skills: SkillContent[]): void {
+		const channelId = this.sessionChannels.get(sessionId);
+		const channel = channelId ? this.channels.get(channelId) : undefined;
+		if (channel) channel.skills = skills;
+	}
+
+	/** The tools a session's agent gets: the page's, and `read_skill` when the site has skills. */
 	listTools(sessionId: string): ToolDescriptor[] {
 		const channelId = this.sessionChannels.get(sessionId);
 		const channel = channelId ? this.channels.get(channelId) : undefined;
-		return channel ? Array.from(channel.tools.values()) : [];
+		return channel ? this.toolsOf(channel) : [];
 	}
 
-	/** Run a page tool in the browser; resolves with its JSON result. Throws on tool errors. */
+	/** Run a page tool in the browser (or `read_skill` here); resolves with its JSON result. Throws on tool errors. */
 	async callTool(sessionId: string, name: string, args: Record<string, unknown>): Promise<unknown> {
 		const channelId = this.sessionChannels.get(sessionId);
 		const channel = channelId ? this.channels.get(channelId) : undefined;
 		if (!channel) throw new Error("The page is not connected");
+		if (name === READ_SKILL && channel.skills.length) return readSkill(channel.skills, args);
 		if (!channel.tools.has(name)) throw new Error(`Unknown tool: ${name}`);
 		return this.forwardToBrowser(channel, "callTool", { tool: name, arguments: args });
+	}
+
+	/** The page's tools, and the engine's `read_skill` in place of a page tool of that name. */
+	private toolsOf(channel: WebMcpChannel): ToolDescriptor[] {
+		const page = Array.from(channel.tools.values());
+		if (!channel.skills.length) return page;
+		return [...page.filter((t) => t.name !== READ_SKILL), readSkillTool(channel.skills)];
 	}
 
 	// ── HTTP / WS dispatch (called from daemon) ──────────────────────────
@@ -802,7 +822,7 @@ export class WebMcpServer {
 
 			case "tools/list":
 				return {
-					tools: Array.from(channel.tools.values()).map((t) => ({
+					tools: this.toolsOf(channel).map((t) => ({
 						name: t.name,
 						description: t.description,
 						inputSchema: t.inputSchema,
@@ -816,6 +836,9 @@ export class WebMcpServer {
 					| Record<string, unknown>
 					| undefined;
 				if (!name) throw new Error("Missing tool name");
+				if (name === READ_SKILL && channel.skills.length) {
+					return { content: [{ type: "text", text: readSkill(channel.skills, args ?? {}) }] };
+				}
 				if (!channel.tools.has(name)) {
 					throw new Error(`Unknown tool: ${name}`);
 				}

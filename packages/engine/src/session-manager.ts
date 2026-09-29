@@ -31,6 +31,7 @@ import { LlmSession } from "./llm/llm-session.js";
 import type { LlmProvider } from "./llm/providers.js";
 import type { Logger } from "./logger.js";
 import { WEBMCP_SERVER_NAME } from "./policy.js";
+import { type SkillContent, skillsPrompt } from "./skills.js";
 import type { WebMcpServer } from "./webmcp-server.js";
 
 export type SessionStatus =
@@ -133,6 +134,8 @@ export interface SessionManagerOptions {
 	logger: Logger;
 	/** Command for the agent serving `origin`: its own choice, or the default AI. */
 	resolveAgent: (origin: string) => Promise<AgentLaunch>;
+	/** The skills `origin` gives its AI, already fetched: the agent gets their list and `read_skill`. */
+	loadSkills?: (origin: string) => Promise<SkillContent[]>;
 	/** ACP handshake timeout. */
 	startTimeoutMs?: number;
 	/**
@@ -310,6 +313,12 @@ export class SessionManager {
 		} catch (err) {
 			this.fail(session, err instanceof Error ? err.message : String(err));
 			return;
+		}
+		if (TERMINAL.has(session.status)) return;
+		const skills = (await this.options.loadSkills?.(session.params.origin).catch(() => [])) ?? [];
+		if (skills.length) {
+			this.options.webMcpServer.setSkills(session.id, skills);
+			session.params.systemPrompt = [session.params.systemPrompt, skillsPrompt(skills)].filter(Boolean).join("\n\n");
 		}
 		if (TERMINAL.has(session.status)) return;
 
