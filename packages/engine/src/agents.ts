@@ -17,7 +17,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, wr
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
-import { fetchRegistry, getRegistryEntry, platformKey, type RegistryEntry } from "./acp/registry.js";
+import { clearRegistryCache, fetchRegistry, getRegistryEntry, platformKey, type RegistryEntry, runnableHere } from "./acp/registry.js";
 import { homePath, loadConfig } from "./home.js";
 import { defaultModel, getProvider, isLlmId, listModels, llmDisplayName, parseLlmId } from "./llm/providers.js";
 import { profileFor } from "./profiles.js";
@@ -89,9 +89,51 @@ async function ensureAgentOnce(
 	}
 	if (installed?.version === entry.version) return installed;
 	options.onProgress?.(`Installing ${entry.name} ${entry.version} from the ACP registry…`);
-	const agent = await install(entry);
-	await profileFor(id)?.prepare?.(agent);
-	return agent;
+	return install(entry);
+}
+
+/** The agents installed here, by registry id. */
+function installedIds(): string[] {
+	const root = agentsDir();
+	if (!existsSync(root)) return [];
+	const ids = readdirSync(root)
+		.filter((name) => name.includes("@") && existsSync(join(root, name, MANIFEST)))
+		.map((name) => name.slice(0, name.lastIndexOf("@")));
+	return [...new Set(ids)];
+}
+
+/**
+ * Keep only the newest version of each installed agent. Call it before any
+ * session starts: an older version may be running otherwise.
+ */
+export function pruneAgentVersions(): void {
+	const root = agentsDir();
+	for (const id of installedIds()) {
+		const versions = readdirSync(root)
+			.filter((name) => name.startsWith(`${id}@`) && existsSync(join(root, name, MANIFEST)))
+			.sort(compareVersions);
+		for (const old of versions.slice(0, -1)) rmSync(join(root, old), { recursive: true, force: true });
+	}
+}
+
+/**
+ * Install the registry's newer version of every agent installed here (new
+ * models, fixes). New sessions use it; running ones keep theirs until they
+ * end. One that fails keeps its version and is tried again next time.
+ */
+export async function updateAgents(onUpdated?: (agent: InstalledAgent, from: string) => Promise<void> | void): Promise<void> {
+	clearRegistryCache();
+	for (const id of installedIds()) {
+		const installed = installedAgent(id);
+		const entry = await getRegistryEntry(id);
+		if (!installed || !entry || !runnableHere(entry) || compareVersions(entry.version, installed.version) <= 0) continue;
+		try {
+			const agent = await ensureAgent(id, { update: true });
+			await onUpdated?.(agent, installed.version);
+		} catch {
+			// Offline, or the install failed: the current version keeps working.
+		}
+	}
 }
 
 /**
@@ -193,6 +235,13 @@ async function install(entry: RegistryEntry): Promise<InstalledAgent> {
 		throw error;
 	}
 	const agent: InstalledAgent = { id: entry.id, name: entry.name, version: entry.version, dir, ...launch };
+	try {
+		await profileFor(entry.id)?.prepare?.(agent);
+	} catch (error) {
+		rmSync(dir, { recursive: true, force: true });
+		throw error;
+	}
+	// Written last: a session only ever finds a version that is complete and prepared.
 	writeFileSync(join(dir, MANIFEST), `${JSON.stringify(agent, null, 2)}\n`);
 	return agent;
 }

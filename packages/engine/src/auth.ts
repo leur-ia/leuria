@@ -195,8 +195,11 @@ function signInStallMs(): number {
 	return Number.isFinite(value) && value > 0 ? value : 10_000;
 }
 
-/** Is the visitor signed in to this agent? Opens (and closes) a real ACP session, within a time limit. */
-export async function checkSignIn(id: string, onProgress?: (message: string) => void): Promise<SignInStatus> {
+/**
+ * Is the visitor signed in to this agent? Opens (and closes) a real ACP session, within a time limit.
+ * `quiet`: a background look for its models; the answer is not remembered as the agent's state.
+ */
+export async function checkSignIn(id: string, onProgress?: (message: string) => void, options: { quiet?: boolean } = {}): Promise<SignInStatus> {
 	if (isLlmId(id)) return checkLlm(id);
 	const { session, close } = await open(id, onProgress);
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -208,7 +211,7 @@ export async function checkSignIn(id: string, onProgress?: (message: string) => 
 	});
 	try {
 		const status = await Promise.race([timedOut, check()]);
-		rememberReady(id, status.ok);
+		if (!options.quiet) rememberReady(id, status.ok);
 		return status;
 	} finally {
 		clearTimeout(timer);

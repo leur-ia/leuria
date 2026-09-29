@@ -2,10 +2,10 @@
 import { spawn } from "node:child_process";
 import { parseArgs } from "node:util";
 
-import { agentName, listAgents, resolveAgentCommand, resolveSiteAgent } from "./agents.js";
+import { agentName, listAgents, pruneAgentVersions, resolveAgentCommand, resolveSiteAgent, updateAgents } from "./agents.js";
 import { createAdminHandler } from "./admin.js";
 import { convertServiceAis } from "./ais.js";
-import { aiLabel, rememberAgentState, signIn } from "./auth.js";
+import { aiLabel, checkSignIn, rememberAgentState, signIn } from "./auth.js";
 import { detectInstalledClis } from "./detect.js";
 import { detectLlms, listModels, llmId, removeProvider, saveProvider } from "./llm/providers.js";
 import { runMcpStdio } from "./mcp-stdio.js";
@@ -332,6 +332,10 @@ function stdioMcpSelf(): { command: string; args: string[] } {
  * a site's claim asks the visitor itself, as with the CLI, and the engine
  * answers every site. Never in a release build.
  */
+/** When the engine looks for newer versions of the installed AIs. */
+const AI_UPDATE_DELAY_MS = 30_000;
+const AI_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
+
 async function startForApp(config: EngineConfig, verbose: boolean, devPairing: boolean): Promise<void> {
 	const token = process.env.LEURIA_ADMIN_TOKEN;
 	if (!token || token.length < 32) throw new Error("LEURIA_ADMIN_TOKEN (32+ characters) is required with --app");
@@ -340,6 +344,12 @@ async function startForApp(config: EngineConfig, verbose: boolean, devPairing: b
 	const grants = new GrantStore();
 	convertServiceAis(grants);
 	config.agent = loadConfig().agent;
+	// Versions left by an update: nothing runs them yet.
+	try {
+		pruneAgentVersions();
+	} catch (err) {
+		logger.warn("could not remove old AI versions", { err: err instanceof Error ? err.message : String(err) });
+	}
 	let port = config.port;
 	const engine = await startEngine({
 		port: config.port,
@@ -371,6 +381,17 @@ async function startForApp(config: EngineConfig, verbose: boolean, devPairing: b
 	});
 	port = engine.port;
 	emit({ event: "ready", port, version: VERSION, agent: config.agent });
+
+	// Newer versions of the installed AIs (new models, fixes): soon after start, then daily.
+	// Its models are asked again, so a new one shows up without the visitor doing anything.
+	const updateAis = () =>
+		void updateAgents(async (agent, from) => {
+			logger.info("AI updated", { id: agent.id, from, to: agent.version });
+			await checkSignIn(agent.id, undefined, { quiet: true }).catch(() => undefined);
+			emit({ event: "agent_updated", id: agent.id });
+		});
+	setTimeout(updateAis, AI_UPDATE_DELAY_MS).unref();
+	setInterval(updateAis, AI_UPDATE_EVERY_MS).unref();
 
 	const shutdown = async () => {
 		await engine.close();

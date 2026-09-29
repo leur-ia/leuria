@@ -12,6 +12,7 @@
  *   POST   /admin/signin  { methodId?, agent? } sign in with an ACP agent method (opens the browser)
  *   POST   /admin/signin/cancel       stop a sign-in in progress
  *   GET    /admin/models?agent=…      models an agent offers (the default AI's without `agent`), with the chosen one as current
+ *                                    `&refresh=1` asks the agent again (starts it for a moment); `stale: true` when it didn't answer
  *   POST   /admin/agent/model { id, model|null } the model to use with an agent (null: the agent's default)
  *   POST   /admin/agent/reset { id }  forget an agent that failed (install and Leuria's sign-in), to start over
  *   GET    /admin/sites               connected sites, each with its AI override and declared needs if any
@@ -296,9 +297,20 @@ export function createAdminHandler(ctx: AdminContext) {
 			return true;
 		}
 		if (route === "GET /models") {
-			const agent = new URL(req.url ?? "", "http://127.0.0.1").searchParams.get("agent") ?? ctx.config.agent;
+			const params = new URL(req.url ?? "", "http://127.0.0.1").searchParams;
+			const agent = params.get("agent") ?? ctx.config.agent;
 			// Asking never installs.
-			sendJson(res, 200, { agent, models: isAvailable(agent) ? await agentModels(agent) : null });
+			if (!isAvailable(agent)) {
+				sendJson(res, 200, { agent, models: null });
+				return true;
+			}
+			// Look again: an agent lists its models when it starts (services are always asked live).
+			const refresh = params.get("refresh") === "1";
+			const answered = refresh && !isLlmId(agent) ? (await checkSignIn(agent)).ok : true;
+			const models = await agentModels(agent);
+			// Not refreshed: the agent didn't answer, or the service couldn't be reached (its list is live).
+			const stale = refresh && (!answered || (isLlmId(agent) && !models));
+			sendJson(res, 200, { agent, models, ...(stale ? { stale: true } : {}) });
 			return true;
 		}
 		if (route === "POST /agent/model") {
