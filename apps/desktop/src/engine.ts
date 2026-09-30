@@ -41,6 +41,8 @@ export interface SignInStatus {
 	methods: Array<{ id: string; name: string; description?: string }>;
 	/** Present once signed in, when the agent lets you choose. */
 	models?: AgentModels;
+	/** The AI signs in only in a terminal (Claude): Leuria opens a window for it (`signIn` with `window`). */
+	window?: boolean;
 }
 
 export interface Site {
@@ -212,7 +214,7 @@ export const engine = {
 	removeAi: (id: string) => call<{ removed: string }>("DELETE", `/ais?id=${encodeURIComponent(id)}`),
 	/** Sign-in state of `agent`, or of the default AI. */
 	signInStatus: (agent?: string) => call<SignInStatus>("GET", `/signin${agent ? `?agent=${encodeURIComponent(agent)}` : ""}`),
-	signIn: (methodId?: string, agent?: string) => call<SignInStatus>("POST", "/signin", { methodId, agent }),
+	signIn: (methodId?: string, agent?: string, window?: boolean) => call<SignInStatus>("POST", "/signin", { methodId, agent, window }),
 	/** Stop the sign-in in progress (the agent's login waits for the browser). */
 	cancelSignIn: () => call<{ ok: boolean }>("POST", "/signin/cancel"),
 	/** Models an AI offers (the default AI's without `agent`); null when it offers no choice. */

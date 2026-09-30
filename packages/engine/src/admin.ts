@@ -9,7 +9,8 @@
  *   DELETE /admin/ais?id=…            take an AI off Your AIs (not the default); its sites go back to the default
  *   POST   /admin/agent   { id }      make an AI the default (sets it up if needed)
  *   GET    /admin/signin[?agent=…]    is the visitor signed in to the (default) agent?
- *   POST   /admin/signin  { methodId?, agent? } sign in with an ACP agent method (opens the browser)
+ *   POST   /admin/signin  { methodId?, agent?, window? } sign in with an ACP agent method (opens the browser),
+ *                             or with `window` the agent's terminal sign-in in a terminal window
  *   POST   /admin/signin/cancel       stop a sign-in in progress
  *   GET    /admin/models?agent=…      models an agent offers (the default AI's without `agent`), with the chosen one as current
  *                                    `&refresh=1` asks the agent again (starts it for a moment); `stale: true` when it didn't answer
@@ -272,7 +273,7 @@ export function createAdminHandler(ctx: AdminContext) {
 			return true;
 		}
 		if (route === "POST /signin") {
-			const body = (await parseBody(req)) as { methodId?: unknown; agent?: unknown };
+			const body = (await parseBody(req)) as { methodId?: unknown; agent?: unknown; window?: unknown };
 			signingIn?.abort();
 			const controller = new AbortController();
 			signingIn = controller;
@@ -280,8 +281,10 @@ export function createAdminHandler(ctx: AdminContext) {
 			const result = await signIn(signingInAgent, {
 				signal: controller.signal,
 				methodId: typeof body.methodId === "string" ? body.methodId : undefined,
-				// The app has no terminal: only agent methods (the agent runs its own flow).
+				// The app has no terminal: agent methods (the agent runs its own flow), or
+				// a terminal-only sign-in (Claude) in a window Leuria opens.
 				terminal: false,
+				window: body.window === true,
 				// Offered in the app too, in case the browser did not come up.
 				onUrl: (url) => ctx.emit({ event: "signin_url", url }),
 				onProgress: (message) => ctx.emit({ event: "progress", stage: "signin", message }),
@@ -455,6 +458,8 @@ export function createAdminHandler(ctx: AdminContext) {
 				// `message` is for the CLI; the app words each stage itself (no jargon for visitors).
 				onStep: (message) => ctx.emit({ event: "progress", stage: "check", step: ++checkStep, message }),
 			});
+			// The app shows the visitor a short line: keep the reason for the log.
+			if (!result.ok) ctx.logger.warn("check failed", { agent, steps: result.steps.filter((step) => !step.ok) });
 			sendJson(res, 200, result);
 			return true;
 		}

@@ -54,9 +54,22 @@ export function Onboarding() {
 							<Steps current={2} />
 							<Heading size="6">Sign in to {friendlyName(step.agent)}</Heading>
 							<Text size="3" color="gray">
-								Leuria uses your own account. Your browser opens to sign in.
+								{step.status.window
+									? `Leuria uses your own account. A window opens with ${friendlyName(step.agent)}'s own sign-in, then your browser.`
+									: "Leuria uses your own account. Your browser opens to sign in."}
 							</Text>
-							{progress && (
+							{progress === "window" && (
+								<Callout.Root color="blue">
+									<Callout.Icon>
+										<Icon name="info" />
+									</Callout.Icon>
+									<Callout.Text>
+										A window opened to sign in to {friendlyName(step.agent)}. Follow the steps there, then come back: this window moves on by
+										itself.
+									</Callout.Text>
+								</Callout.Root>
+							)}
+							{progress && progress !== "window" && (
 								<Callout.Root color="blue">
 									<Callout.Icon>
 										<Icon name="info" />
@@ -78,13 +91,18 @@ export function Onboarding() {
 								</Callout.Root>
 							)}
 							{error && <Problem>{error}</Problem>}
-							{step.status.methods.length === 0 && (
+							{step.status.window && (
+								<InkButton loading={Boolean(progress)} onClick={() => void onboardingStore.signIn(step.agent)}>
+									Sign in to {friendlyName(step.agent)}
+								</InkButton>
+							)}
+							{step.status.methods.length === 0 && !step.status.window && (
 								<Problem>{plainReason(step.status.detail) ?? `${friendlyName(step.agent)} can't be signed in from Leuria. Pick another AI.`}</Problem>
 							)}
 							{[...step.status.methods]
 								.sort((a, b) => Number(isApiKey(a)) - Number(isApiKey(b)))
 								.map((method, index) =>
-									index === 0 ? (
+									index === 0 && !step.status.window ? (
 										<InkButton key={method.id} loading={Boolean(progress)} onClick={() => void onboardingStore.signIn(step.agent, method.id)}>
 											{signInLabel(method)}
 										</InkButton>

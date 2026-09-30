@@ -53,15 +53,30 @@ async function handle(msg) {
 		return;
 	}
 	switch (msg.method) {
-		case "initialize":
-			return send({
+		case "initialize": {
+			// FAKE_AUTH_STATUS=<kind>: report the sign-in as Claude does (`_auth/status_update`), after answering.
+			const authStatus = process.env.FAKE_AUTH_STATUS;
+			// FAKE_TERMINAL_AUTH=1: a command-line sign-in too, for clients that can run one (Claude's `auth login`).
+			const terminal = process.env.FAKE_TERMINAL_AUTH && msg.params.clientCapabilities?.auth?.terminal === true;
+			send({
 				id: msg.id,
 				result: {
 					protocolVersion: msg.params.protocolVersion,
-					agentCapabilities: { promptCapabilities: { image: true }, mcpCapabilities: { http: httpMcp } },
-					authMethods: [{ id: "account", name: "Fake account" }],
+					agentCapabilities: {
+						promptCapabilities: { image: true },
+						mcpCapabilities: { http: httpMcp },
+						...(authStatus ? { _meta: { authStatus: {} } } : {}),
+					},
+					authMethods: [
+						...(terminal ? [{ id: "cli-login", name: "Fake login", type: "terminal", args: ["--login"] }] : []),
+						// FAKE_TERMINAL_AUTH=only: nothing but the command-line sign-in, as Claude.
+						...(process.env.FAKE_TERMINAL_AUTH === "only" ? [] : [{ id: "account", name: "Fake account" }]),
+					],
 				},
 			});
+			if (authStatus) setTimeout(() => send({ method: "_auth/status_update", params: { authStatus: { kind: authStatus, label: authStatus } } }), 50);
+			return;
+		}
 		case "authenticate":
 			// FAKE_STALL_ONCE=<file>: the first sign-in hangs without opening a page (as Codex can);
 			// the file marks it, so the next agent signs in.

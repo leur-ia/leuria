@@ -227,7 +227,7 @@ function SiteRow({
 	busy: boolean;
 	signInNeeded: {
 		agent: string;
-		status: { methods: Array<{ id: string; name: string }> };
+		status: { methods: Array<{ id: string; name: string }>; window?: boolean };
 	} | null;
 	/** The site asked (from the visitor's click on it) to change its AI or model: shown open. */
 	focused: boolean;
@@ -372,10 +372,16 @@ function SiteRow({
 				{busy && <Spinner size="1" />}
 			</Flex>
 			{site.skills && <SiteSkills list={site.skills.list} />}
-			{method && (
-				<Button size="1" variant="soft" style={{ alignSelf: "flex-start" }} onClick={() => void homeStore.signInSiteAgent(method.id)}>
-					{signInLabel(method)} for this site
+			{signInNeeded?.status.window ? (
+				<Button size="1" variant="soft" style={{ alignSelf: "flex-start" }} onClick={() => void homeStore.signInSiteAgent()}>
+					Sign in to {friendlyName({ id: signInNeeded.agent, name: signInNeeded.agent })} for this site
 				</Button>
+			) : (
+				method && (
+					<Button size="1" variant="soft" style={{ alignSelf: "flex-start" }} onClick={() => void homeStore.signInSiteAgent(method.id)}>
+						{signInLabel(method)} for this site
+					</Button>
+				)
 			)}
 		</div>
 	);

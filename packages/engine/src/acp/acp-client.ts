@@ -152,6 +152,9 @@ export class AcpLiveSession {
 	private imagesSupported = false;
 	/** `initialize` result, once connected. */
 	info: AgentInfo | null = null;
+	/** The sign-in the agent says it uses, from `_auth/status_update` (Claude): "account", "api_key", "none"… */
+	private authKind: string | undefined;
+	private authWaiters: Array<(kind: string) => void> = [];
 	/** Models the agent offers, from `session/new` (and later updates). */
 	models: AgentModels | null = null;
 
@@ -233,6 +236,28 @@ export class AcpLiveSession {
 			this.close();
 			return { error: error instanceof Error ? error.message : String(error) };
 		}
+	}
+
+	/**
+	 * The sign-in the agent reports (see `authKind`), waiting up to `ms` for its first
+	 * report. Undefined when the agent doesn't report one, or not in time. Some agents
+	 * (Claude) open a session while signed out and refuse only the first prompt, so a
+	 * session alone doesn't prove a sign-in.
+	 */
+	async authStatus(ms: number): Promise<string | undefined> {
+		if (this.authKind !== undefined) return this.authKind;
+		if (!this.info?.agentCapabilities._meta?.authStatus) return undefined;
+		return new Promise((resolve) => {
+			const timer = setTimeout(() => {
+				this.authWaiters = this.authWaiters.filter((w) => w !== waiter);
+				resolve(undefined);
+			}, ms);
+			const waiter = (kind: string) => {
+				clearTimeout(timer);
+				resolve(kind);
+			};
+			this.authWaiters.push(waiter);
+		});
 	}
 
 	/** ACP `authenticate` with one of the advertised methods (the agent runs its own flow). */
@@ -396,6 +421,13 @@ export class AcpLiveSession {
 
 		return sdk
 			.client({ name: "leuria" })
+			// Claude's `authStatus` extension: the agent pushes which sign-in it uses, "none" when signed out.
+			.onNotification("_auth/status_update", rawParams, (ctx) => {
+				const kind = ctx.params?.authStatus?.kind;
+				if (typeof kind !== "string") return;
+				this.authKind = kind;
+				for (const waiter of this.authWaiters.splice(0)) waiter(kind);
+			})
 			.onNotification("session/update", rawParams, (ctx) =>
 				handleSessionUpdate(ctx.params),
 			)

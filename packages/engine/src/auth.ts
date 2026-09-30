@@ -22,6 +22,7 @@ import { type AgentInfo, type AgentModels, AcpLiveSession } from "./acp/acp-clie
 import { homePath, loadConfig, readJson, rememberReady, writeJson } from "./home.js";
 import { agentName, ensureAgent } from "./agents.js";
 import { removeScratch } from "./scratch.js";
+import { canOpenTerminalWindow, runInTerminalWindow } from "./terminal-window.js";
 import { catchBrowserLinks } from "./browser-link.js";
 import { defaultModel, getProvider, isLlmId, listModels, parseLlmId } from "./llm/providers.js";
 import { profileFor } from "./profiles.js";
@@ -32,6 +33,11 @@ export interface SignInStatus {
 	methods: AgentInfo["authMethods"];
 	/** Models the agent offers once signed in (from `session/new`), with the visitor's choice as `current`. */
 	models?: AgentModels;
+	/**
+	 * The agent signs in only on the command line (Claude): Leuria can open a
+	 * terminal window for it (`signIn(id, { window: true })`).
+	 */
+	window?: boolean;
 }
 
 /**
@@ -202,7 +208,8 @@ function signInStallMs(): number {
  */
 export async function checkSignIn(id: string, onProgress?: (message: string) => void, options: { quiet?: boolean } = {}): Promise<SignInStatus> {
 	if (isLlmId(id)) return checkLlm(id);
-	const { session, close } = await open(id, onProgress);
+	// Terminal sign-ins declared, so the agent lists them: they tell whether a window can sign it in.
+	const { session, close } = await open(id, onProgress, true);
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const timedOut = new Promise<SignInStatus>((resolve) => {
 		timer = setTimeout(() => {
@@ -223,10 +230,15 @@ export async function checkSignIn(id: string, onProgress?: (message: string) => 
 	async function check(): Promise<SignInStatus> {
 		const connected = await session.connect();
 		if (connected.error) return { ok: false, detail: `the agent did not start: ${connected.error}`, methods: [] };
-		const methods = agentMethods(session.info?.authMethods ?? []);
+		const all = session.info?.authMethods ?? [];
+		const methods = agentMethods(all);
+		// Only for an AI that signs in nowhere else (Claude): a browser sign-in stays the way when there is one.
+		const window = canOpenTerminalWindow() && methods.length === 0 && all.some(isTerminal) ? { window: true } : {};
 		const created = await session.newSession();
-		if (!created.error) return { ok: true, detail: "ready", methods, ...withChoice(id, session.models) };
-		return { ok: false, detail: created.authRequired ? "not signed in" : created.error, methods };
+		if (created.error) return { ok: false, detail: created.authRequired ? "not signed in" : created.error, methods, ...window };
+		// Claude opens a session while signed out and refuses only the first question: ask it which sign-in it has.
+		if ((await session.authStatus(5_000)) === "none") return { ok: false, detail: "not signed in", methods, ...window };
+		return { ok: true, detail: "ready", methods, ...withChoice(id, session.models) };
 	}
 }
 
@@ -237,6 +249,8 @@ export async function signIn(
 		methodId?: string;
 		/** The caller can run an interactive terminal method (a TTY). */
 		terminal?: boolean;
+		/** Run the agent's terminal sign-in in a new terminal window (the desktop app has no terminal). */
+		window?: boolean;
 		onProgress?: (message: string) => void;
 		/** Cancel a sign-in in progress: the agent is stopped (which frees its login callback). */
 		signal?: AbortSignal;
@@ -247,7 +261,7 @@ export async function signIn(
 	if (isLlmId(id)) return checkLlm(id);
 	let pageOpened = false;
 	const link =
-		options.onUrl && !options.terminal
+		options.onUrl && !options.terminal && !options.window
 			? catchBrowserLinks((url) => {
 					pageOpened = true;
 					options.onUrl?.(url);
@@ -255,7 +269,7 @@ export async function signIn(
 			: null;
 	let opened: Awaited<ReturnType<typeof open>>;
 	try {
-		opened = await open(id, options.onProgress, options.terminal, link?.env);
+		opened = await open(id, options.onProgress, options.terminal || options.window, link?.env);
 	} catch (error) {
 		link?.stop();
 		throw error;
@@ -305,16 +319,34 @@ export async function signIn(
 		const connected = await session.connect();
 		if (connected.error) return { ok: false, detail: `the agent did not start: ${connected.error}`, methods: [] };
 		const all = session.info?.authMethods ?? [];
-		const methods = options.terminal ? all : agentMethods(all);
+		const terminal = options.terminal || options.window;
+		const methods = terminal ? all : agentMethods(all);
 		if (methods.length === 0) {
 			return { ok: false, detail: `${agent.name} offers no sign-in method Leuria can run; sign in with its own tool.`, methods };
 		}
 		const method = options.methodId
 			? methods.find((m) => m.id === options.methodId)
-			: preferredMethod(methods, { terminal: options.terminal });
+			: preferredMethod(methods, { terminal });
 		if (!method) return { ok: false, detail: `Unknown method. Available: ${methods.map((m) => m.id).join(", ")}`, methods };
 		options.onProgress?.(`Signing in to ${agent.name} with ${method.name}${method.description ? ` (${method.description})` : ""}…`);
 
+		if (isTerminal(method) && options.window) {
+			// The same command as below, in a window the visitor sees and types in.
+			session.close();
+			const code = await runInTerminalWindow({
+				title: `Sign in to ${agentName(id)}`,
+				command: agent.command,
+				args: [...agent.launchArgs, ...(method.args ?? [])],
+				// A compiled engine runs JavaScript agents as plain Bun, as sessions do.
+				env: { ...env, ...(method.env ?? {}), ...(process.versions.bun ? { BUN_BE_BUN: "1" } : {}) },
+				cwd: sandbox,
+				signal: options.signal,
+			});
+			if (options.signal?.aborted) return { ok: false, detail: "cancelled", methods };
+			if (code === null) return { ok: false, detail: "the sign-in window didn't finish", methods, window: true };
+			if (code !== 0) return { ok: false, detail: `the sign-in ended with code ${code}`, methods, window: true };
+			return checkSignIn(id, options.onProgress);
+		}
 		if (isTerminal(method)) {
 			// Terminal auth: the method's args/env replace the registry's, in this terminal.
 			session.close();

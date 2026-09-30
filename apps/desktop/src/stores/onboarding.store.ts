@@ -108,7 +108,13 @@ function message(error: unknown): string {
 /** Run the check and land on the result. */
 async function check(agent: AgentChoice): Promise<Partial<OnboardingState>> {
 	onboardingStore.updateState({ step: { kind: "checking", agent }, progress: "" });
-	return { step: { kind: "done", agent, result: await engine.test(agent.id) } };
+	const result = await engine.test(agent.id);
+	if (!result.ok) {
+		// Signed out after all (an AI that only refuses at the first question): sign in again, not "didn't answer".
+		const status = await engine.signInStatus(agent.id).catch(() => null);
+		if (status && !status.ok && status.detail === "not signed in") return { step: { kind: "signin", agent, status } as Step, error: "" };
+	}
+	return { step: { kind: "done", agent, result } };
 }
 
 export const onboardingStore = createStore(initial, {
@@ -227,11 +233,14 @@ export const onboardingStore = createStore(initial, {
 			};
 		}
 	},
-	/** ACP authenticate: the agent opens the browser and waits for the sign-in there. */
-	signIn: async (_state, agent: AgentChoice, methodId: string) => {
-		onboardingStore.updateState({ progress: "waiting", error: "", signinUrl: "" });
+	/**
+	 * ACP authenticate: the agent opens the browser and waits for the sign-in there.
+	 * Without a method, `window`: the AI's own sign-in in a terminal window (Claude).
+	 */
+	signIn: async (_state, agent: AgentChoice, methodId?: string) => {
+		onboardingStore.updateState({ progress: methodId ? "waiting" : "window", error: "", signinUrl: "" });
 		try {
-			const status = await engine.signIn(methodId, agent.id);
+			const status = await engine.signIn(methodId, agent.id, !methodId);
 			if (status.ok) {
 				onboardingStore.updateState({ models: status.models ?? null });
 				return await check(agent);
@@ -242,7 +251,9 @@ export const onboardingStore = createStore(initial, {
 				step: { kind: "signin", agent, status } as Step,
 				progress: "",
 				// The AI's own reason when it gave one (e.g. Google no longer allows this sign-in).
-				error: plainReason(status.detail) ?? "The sign-in didn't finish. Try again, and complete it in your browser.",
+				error:
+					plainReason(status.detail) ??
+					(methodId ? "The sign-in didn't finish. Try again, and complete it in your browser." : "The sign-in didn't finish. Try again, and follow the steps in the window that opens."),
 			};
 		} catch (error) {
 			console.warn("Sign-in failed:", error);

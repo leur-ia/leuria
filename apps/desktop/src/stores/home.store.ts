@@ -196,12 +196,12 @@ export const homeStore = createStore(initial, {
 			};
 		}
 	},
-	/** Sign in to a site's own AI (ACP authenticate: the browser opens). */
-	signInSiteAgent: async (state, methodId: string) => {
+	/** Sign in to a site's own AI (ACP authenticate: the browser opens; without a method, a terminal window). */
+	signInSiteAgent: async (state, methodId?: string) => {
 		const pending = state.signInNeeded;
 		if (!pending) return {};
 		homeStore.updateState({ settingUp: pending.origin });
-		const status = await engine.signIn(methodId, pending.agent).catch((error: unknown) => ({
+		const status = await engine.signIn(methodId, pending.agent, !methodId).catch((error: unknown) => ({
 			ok: false,
 			detail: message(error),
 			methods: pending.status.methods,
