@@ -13,7 +13,7 @@
  *     and the desktop app never does.
  */
 
-import { spawn } from "node:child_process";
+import crossSpawn from "cross-spawn";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -318,7 +318,7 @@ export async function signIn(
 			// Terminal auth: the method's args/env replace the registry's, in this terminal.
 			session.close();
 			const code = await new Promise<number | null>((resolve, reject) => {
-				const child = spawn(agent.command, [...agent.launchArgs, ...(method.args ?? [])], {
+				const child = crossSpawn(agent.command, [...agent.launchArgs, ...(method.args ?? [])], {
 					stdio: "inherit",
 					cwd: sandbox,
 					env: { ...process.env, ...env, ...(method.env ?? {}) },

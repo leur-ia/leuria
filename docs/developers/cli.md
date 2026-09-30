@@ -4,7 +4,7 @@ People who use Leuria install the [desktop app](https://leuria.eu/download). Whi
 
 - to try your site with your own AI, without installing the app;
 - in automated tests, on a machine without a screen;
-- on Windows or Linux, until the desktop app is available there.
+- on Linux, until the desktop app is available there.
 
 It needs [Node.js](https://nodejs.org) 22 or later.
 

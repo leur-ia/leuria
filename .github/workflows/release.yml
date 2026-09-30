@@ -1,9 +1,12 @@
 name: Release
 
 # Push a tag like v0.1.0 (the version in apps/desktop/src-tauri/tauri.conf.json):
-# this builds Leuria for Apple Silicon and Intel Macs into a draft release.
-# Publishing the draft makes it the download on leuria.eu, the update running
-# apps install, and the Homebrew cask in Casks/ (see homebrew.yml).
+# this builds Leuria for Apple Silicon and Intel Macs and for Windows into a
+# draft release. Publishing the draft makes it the download on leuria.eu, the
+# update running apps install, and the Homebrew cask in Casks/ (see homebrew.yml).
+#
+# Windows builds are signed through SignPath when the SIGNPATH_* variables and
+# secret are set in the repository settings; without them they are unsigned.
 
 on:
   push:
@@ -64,7 +67,7 @@ jobs:
           args: --target ${{ matrix.target }} --config src-tauri/tauri.release.conf.json
           tagName: v__VERSION__
           releaseName: Leuria __VERSION__
-          releaseBody: Download Leuria for your Mac below, or install it with Homebrew.
+          releaseBody: Download Leuria for your Mac or Windows below, or install it on a Mac with Homebrew.
           releaseDraft: true
 
       # Stable names, so leuria.eu and the cask can link to .../latest/download/<name>.
@@ -76,3 +79,173 @@ jobs:
           dmg=$(ls apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg)
           cp "$dmg" "Leuria-mac-${{ matrix.name }}.dmg"
           gh release upload "v$version" "Leuria-mac-${{ matrix.name }}.dmg" --clobber
+
+  windows:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    env:
+      TARGET: x86_64-pc-windows-msvc
+      # Code signing is on once the SignPath project exists (see the top of this file).
+      SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: The tag matches the app's version
+        id: version
+        run: |
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "v$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME, app version $version"; exit 1; }
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the engine
+        run: pnpm --filter @leuria/desktop build:engine
+        env:
+          TAURI_ENV_TARGET_TRIPLE: ${{ env.TARGET }}
+
+      # In three steps, so that what the installer holds is signed before the
+      # installer itself is built: the app, then its installer.
+      - name: Build the app
+        working-directory: apps/desktop
+        run: pnpm tauri build --target "$TARGET" --no-bundle
+
+      - name: Gather the programs to sign
+        if: env.SIGN == 'true'
+        run: |
+          mkdir -p unsigned/app
+          cp "apps/desktop/src-tauri/target/$TARGET/release/leuria-desktop.exe" unsigned/app/
+          cp "apps/desktop/src-tauri/binaries/leuria-engine-$TARGET.exe" unsigned/app/leuria-engine.exe
+      - name: Upload the programs to sign
+        id: unsigned-app
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-app
+          path: unsigned/app
+      - name: Sign the programs
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: app
+          github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
+          # The artifact configuration checks the programs carry this version.
+          parameters: |
+            version: "${{ steps.version.outputs.version }}"
+          wait-for-completion: true
+          # Each release waits for someone to approve it in SignPath.
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed/app
+      - name: Put the signed programs back
+        if: env.SIGN == 'true'
+        run: |
+          cp signed/app/leuria-desktop.exe "apps/desktop/src-tauri/target/$TARGET/release/leuria-desktop.exe"
+          cp signed/app/leuria-engine.exe "apps/desktop/src-tauri/binaries/leuria-engine-$TARGET.exe"
+
+      - name: Build the installer
+        working-directory: apps/desktop
+        env:
+          # Signs updates (the installer's .sig, which running apps check).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri bundle --target "$TARGET" --bundles nsis --config src-tauri/tauri.release.conf.json
+
+      - name: Find the installer
+        id: installer
+        run: |
+          path=$(ls "apps/desktop/src-tauri/target/$TARGET/release/bundle/nsis/"*-setup.exe)
+          {
+            echo "path=$path"
+            echo "dir=$(dirname "$path")"
+            echo "name=$(basename "$path")"
+          } >> "$GITHUB_OUTPUT"
+      - name: Upload the installer to sign
+        id: unsigned-installer
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: ${{ steps.installer.outputs.path }}
+      - name: Sign the installer
+        if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          parameters: |
+            version: "${{ steps.version.outputs.version }}"
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed/installer
+      # The update signature must be over the file people download: the signed one.
+      - name: Put the signed installer back, and sign it for updates again
+        if: env.SIGN == 'true'
+        working-directory: apps/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          installer="$GITHUB_WORKSPACE/${{ steps.installer.outputs.path }}"
+          cp "$GITHUB_WORKSPACE/signed/installer/${{ steps.installer.outputs.name }}" "$installer"
+          pnpm tauri signer sign --app-version "${{ steps.version.outputs.version }}" "$installer"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            ${{ steps.installer.outputs.dir }}/${{ steps.installer.outputs.name }}
+            ${{ steps.installer.outputs.dir }}/${{ steps.installer.outputs.name }}.sig
+
+  # After the Mac builds, which create the draft release and its latest.json:
+  # add the Windows installer and its update entry.
+  windows-release:
+    needs: [desktop, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows
+          path: windows
+      - name: Upload the installer, and add it to the update file
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.windows.outputs.version }}
+        run: |
+          installer=$(cd windows && ls -- *-setup.exe)
+          # A stable name too, so leuria.eu can link to .../latest/download/Leuria-windows-setup.exe.
+          cp "windows/$installer" Leuria-windows-setup.exe
+          gh release upload "v$VERSION" "windows/$installer" "windows/$installer.sig" Leuria-windows-setup.exe --clobber
+
+          gh release download "v$VERSION" --pattern latest.json --dir .
+          entry=$(jq -n --arg signature "$(cat "windows/$installer.sig")" \
+            --arg url "https://github.com/$GH_REPO/releases/download/v$VERSION/$installer" \
+            '{signature: $signature, url: $url}')
+          jq --argjson entry "$entry" \
+            '.platforms["windows-x86_64"] = $entry | .platforms["windows-x86_64-nsis"] = $entry' \
+            latest.json > latest.next.json
+          mv latest.next.json latest.json
+          gh release upload "v$VERSION" latest.json --clobber

@@ -56,7 +56,7 @@ LEURIA_HOME=/tmp/clean npx -y --package=/tmp/leuria-0.1.0.tgz leuria test
 
 ## Pairing with the desktop app in development
 
-On macOS, `leuria://connect` links reach only a bundled app that the system knows, not the one `pnpm desktop` runs. So a debug build starts its engine with `--dev-pairing`: a site's claim asks the visitor itself (as with the CLI), and the engine answers every site, so it isn't silent. To try the real deep link, build the app (`pnpm desktop:build`), quit the dev app, and open `apps/desktop/src-tauri/target/release/bundle/macos/Leuria.app`.
+On macOS, `leuria://connect` links reach only a bundled app that the system knows, not the one `pnpm desktop` runs. So a debug build starts its engine with `--dev-pairing`: a site's claim asks the visitor itself (as with the CLI), and the engine answers every site, so it isn't silent. To try the real deep link, build the app (`pnpm desktop:build`), quit the dev app, and open `apps/desktop/src-tauri/target/release/bundle/macos/Leuria.app`. On Windows the installer registers the links: run the `-setup.exe` from `bundle/nsis/`.
 
 ## The developer portal
 

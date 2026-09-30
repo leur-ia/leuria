@@ -4,7 +4,7 @@
 
 The site's code stays in the page: the visitor's agent can only call tools the page provides. It can't read files or run commands on the visitor's machine.
 
-> Status: early. The desktop app is for Mac; on Windows and Linux, run the engine from a terminal. AIs: ChatGPT (through Codex), Claude Code and other ACP agents, models in LM Studio and Ollama, and any OpenAI-compatible API.
+> Status: early. The desktop app is for Mac and Windows; on Linux, run the engine from a terminal. AIs: ChatGPT (through Codex), Claude Code and other ACP agents, models in LM Studio and Ollama, and any OpenAI-compatible API.
 
 ## Use it
 
@@ -102,4 +102,4 @@ node packages/engine/dist/cli.js test   # real round trip with your Claude
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Licensed under [Apache 2.0](LICENSE).
+Licensed under [Apache 2.0](LICENSE). See the [privacy policy](https://leuria.eu/privacy-policy) and the [code signing policy](https://leuria.eu/code-signing).

@@ -17,6 +17,8 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, wr
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
+import crossSpawn from "cross-spawn";
+
 import { clearRegistryCache, fetchRegistry, getRegistryEntry, platformKey, type RegistryEntry, runnableHere } from "./acp/registry.js";
 import { homePath, loadConfig } from "./home.js";
 import { defaultModel, getProvider, isLlmId, listModels, llmDisplayName, parseLlmId } from "./llm/providers.js";
@@ -253,12 +255,7 @@ async function installPackage(dir: string, spec: string, args: string[], env: Re
 		// Inside the desktop app there is no npm: the bundled Bun installs.
 		await execFileAsync(process.execPath, ["add", spec], { cwd: dir, env: { ...process.env, BUN_BE_BUN: "1" }, timeout: 5 * 60_000 });
 	} else {
-		const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-		await execFileAsync(npm, ["install", "--no-audit", "--no-fund", "--omit=dev", "--loglevel=error", spec], {
-			cwd: dir,
-			timeout: 5 * 60_000,
-			shell: process.platform === "win32",
-		});
+		await run("npm", ["install", "--no-audit", "--no-fund", "--omit=dev", "--loglevel=error", spec], { cwd: dir, timeout: 5 * 60_000 });
 	}
 	const name = spec.lastIndexOf("@") > 0 ? spec.slice(0, spec.lastIndexOf("@")) : spec;
 	const pkgDir = join(dir, "node_modules", ...name.split("/"));
@@ -271,6 +268,30 @@ async function installPackage(dir: string, spec: string, args: string[], env: Re
 	return isScript
 		? { command: process.execPath, launchArgs: [entry], args, env }
 		: { command: entry, launchArgs: [], args, env };
+}
+
+/**
+ * Run a command to the end, without a shell (cross-spawn finds `npm.cmd` on
+ * Windows and escapes each argument for it). Rejects with its error output.
+ */
+function run(command: string, args: string[], options: { cwd: string; timeout: number }): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const child = crossSpawn(command, args, { cwd: options.cwd, stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+		let stderr = "";
+		child.stderr?.on("data", (chunk: Buffer) => {
+			stderr += chunk.toString("utf-8");
+		});
+		const timer = setTimeout(() => child.kill(), options.timeout);
+		child.on("error", (error) => {
+			clearTimeout(timer);
+			reject(error);
+		});
+		child.on("close", (code) => {
+			clearTimeout(timer);
+			if (code === 0) resolve();
+			else reject(new Error(`${command} ${args.join(" ")} failed (${code ?? "stopped"})${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
+		});
+	});
 }
 
 /** Binary archive: download, check its sha256, extract, point at `cmd`. */

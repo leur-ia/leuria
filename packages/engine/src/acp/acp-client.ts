@@ -8,6 +8,7 @@
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
+import crossSpawn from "cross-spawn";
 import { Readable, Writable } from "node:stream";
 
 import {
@@ -176,11 +177,13 @@ export class AcpLiveSession {
 		// A compiled Bun engine runs JavaScript agents as plain Bun.
 		if (process.versions.bun) env.BUN_BE_BUN = "1";
 
-		const child = spawn(this.options.command, this.options.args, {
+		// cross-spawn, not a shell: on Windows it runs .cmd launchers through cmd.exe with
+		// each argument escaped, and paths with spaces (C:\Users\Jane Doe) stay whole.
+		const child = crossSpawn(this.options.command, this.options.args, {
 			stdio: ["pipe", "pipe", "pipe"],
 			env,
 			cwd: this.options.cwd,
-			shell: process.platform === "win32",
+			windowsHide: true,
 			// Its own process group, so close() also stops what the agent starts
 			// (Gemini relaunches itself as a child process).
 			detached: process.platform !== "win32",
@@ -413,7 +416,7 @@ export class AcpLiveSession {
 function killTree(child: ChildProcess): void {
 	try {
 		if (process.platform === "win32" && child.pid) {
-			spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+			spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
 		} else if (child.pid) {
 			process.kill(-child.pid, "SIGTERM");
 		} else {

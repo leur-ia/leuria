@@ -104,6 +104,8 @@ export function writeJson(path: string, data: unknown): void {
 	const tmp = `${path}.${process.pid}.tmp`;
 	writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, { mode: 0o600 });
 	renameSync(tmp, path);
+	// Windows ignores the mode: there the file keeps the permissions of the
+	// user's folder, where other users (administrators aside) have no access.
 	try {
 		chmodSync(path, 0o600);
 	} catch {

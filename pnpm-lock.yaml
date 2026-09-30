@@ -277,6 +277,9 @@ importers:
       cacache:
         specifier: ^21.0.1
         version: 21.0.1
+      cross-spawn:
+        specifier: ^7.0.6
+        version: 7.0.6
       giget:
         specifier: ^3.3.1
         version: 3.3.1
@@ -293,6 +296,9 @@ importers:
       '@types/cacache':
         specifier: ^20.0.1
         version: 20.0.1
+      '@types/cross-spawn':
+        specifier: ^6.0.6
+        version: 6.0.6
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.4
@@ -3894,6 +3900,9 @@ packages:
 
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
+
+  '@types/cross-spawn@6.0.6':
+    resolution: {integrity: sha512-fXRhhUkG4H3TQk5dBhQ7m/JDdSNHKwR2BBia62lhwEIq9xGiQKLxd6LymNhn47SjXhsUEPmxi+PKw2OkW4LLjA==}
 
   '@types/d3-array@3.2.2':
     resolution: {integrity: sha512-hOLWVbm7uRza0BYXpIIW5pxfrKe0W+D5lrFiAEYR+pb6w3N2SwSMaJbXdUfSEv+dT4MfHBLtn5js0LAWaO6otw==}
@@ -13130,6 +13139,10 @@ snapshots:
       '@types/node': 22.20.4
 
   '@types/connect@3.4.38':
+    dependencies:
+      '@types/node': 22.20.4
+
+  '@types/cross-spawn@6.0.6':
     dependencies:
       '@types/node': 22.20.4
 

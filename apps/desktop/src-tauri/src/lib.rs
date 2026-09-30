@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{
     image::Image,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
-    tray::TrayIconBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, RunEvent, WindowEvent,
 };
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -26,6 +26,8 @@ struct Engine {
     token: String,
     port: Mutex<Option<u16>>,
     child: Mutex<Option<CommandChild>>,
+    /// The engine has stopped.
+    exited: Mutex<bool>,
 }
 
 #[derive(Serialize, Clone)]
@@ -156,6 +158,7 @@ fn start_engine(app: &AppHandle) -> tauri::Result<()> {
                     eprintln!("[engine] {}", String::from_utf8_lossy(&line).trim_end());
                 }
                 CommandEvent::Terminated(status) => {
+                    *app.state::<Engine>().exited.lock().unwrap() = true;
                     let _ = app.emit("engine-exit", status.code);
                 }
                 _ => {}
@@ -165,18 +168,41 @@ fn start_engine(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Ask the engine to stop (it stops the AIs it started, which a forced stop
+/// would leave running), and force it after a few seconds.
+fn stop_engine(app: &AppHandle) {
+    let engine = app.state::<Engine>();
+    let Some(mut child) = engine.child.lock().unwrap().take() else {
+        return;
+    };
+    if child.write(b"quit\n").is_ok() {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while !*engine.exited.lock().unwrap() && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+    if !*engine.exited.lock().unwrap() {
+        let _ = child.kill();
+    }
+}
+
 /// The Leuria mark alone, as the system expects in the menu bar. On macOS
 /// a template image: black with transparency, which macOS draws white on
-/// a dark menu bar and dark on a light one. Elsewhere, the white mark.
+/// a dark menu bar and dark on a light one. On Windows, the app icon, which
+/// reads on a light or dark taskbar. Elsewhere, the white mark.
 #[cfg(target_os = "macos")]
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray/tray-template@2x.png");
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+const TRAY_ICON: &[u8] = include_bytes!("../icons/tray/tray-color.png");
+#[cfg(not(any(target_os = "macos", windows)))]
 const TRAY_ICON: &[u8] = include_bytes!("../icons/tray/tray-white.png");
 
 /// The same mark with a download badge, while an update waits for a restart.
 #[cfg(target_os = "macos")]
 const TRAY_UPDATE_ICON: &[u8] = include_bytes!("../icons/tray/tray-update-template@2x.png");
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+const TRAY_UPDATE_ICON: &[u8] = include_bytes!("../icons/tray/tray-update-color.png");
+#[cfg(not(any(target_os = "macos", windows)))]
 const TRAY_UPDATE_ICON: &[u8] = include_bytes!("../icons/tray/tray-update-white.png");
 
 /// One model in the tray's "Model" menu.
@@ -245,11 +271,32 @@ fn open_link(url: String) -> Result<(), String> {
     result.map(|_| ()).map_err(|e| e.to_string())
 }
 
-/// "Restart Leuria" when the engine stopped: a fresh app starts a fresh engine.
+/// "Restart Leuria" when the engine stopped, or "Restart to update": a fresh
+/// app starts a fresh engine, on the new version when one is waiting.
 #[tauri::command]
 fn restart_app(app: AppHandle) {
+    restart(&app);
+}
+
+fn restart(app: &AppHandle) {
+    // Windows: the downloaded installer replaces Leuria and opens it again (this exits the app).
+    #[cfg(windows)]
+    {
+        let downloaded = app.state::<Downloaded>().0.lock().unwrap().take();
+        if let Some((update, bytes)) = downloaded {
+            if let Err(error) = update.install(bytes) {
+                eprintln!("[update] {error}");
+            }
+        }
+    }
+    stop_engine(app);
     app.restart();
 }
+
+/// Windows: an update downloaded, waiting for "Restart to update". Windows
+/// can't replace a running app, and its installer closes Leuria when it starts.
+#[cfg(windows)]
+struct Downloaded(Mutex<Option<(tauri_plugin_updater::Update, Vec<u8>)>>);
 
 /// The window keeps the tray's model list in step with the default AI.
 #[tauri::command]
@@ -285,8 +332,8 @@ fn show_update_icon(app: &AppHandle) -> tauri::Result<()> {
 const UPDATE_EVERY: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
 
 /// Look for a new version soon after launch, then every few hours. A new one
-/// installs in the background and applies on the next start; the tray offers
-/// to restart now, so a conversation is never cut short.
+/// installs in the background (Windows: downloads) and applies on the next
+/// start; the tray offers to restart now, so a conversation is never cut short.
 fn watch_updates(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -317,9 +364,17 @@ async fn install_update(app: &AppHandle) -> tauri_plugin_updater::Result<Option<
     if let Some(version) = pending(app) {
         return Ok(Some(version));
     }
-    let Some(update) = app.updater()?.check().await? else {
+    let stopping = app.clone();
+    let updater = app.updater_builder().on_before_exit(move || stop_engine(&stopping)).build()?;
+    let Some(update) = updater.check().await? else {
         return Ok(None);
     };
+    #[cfg(windows)]
+    {
+        let bytes = update.download(|_, _| {}, || {}).await?;
+        *app.state::<Downloaded>().0.lock().unwrap() = Some((update.clone(), bytes));
+    }
+    #[cfg(not(windows))]
     update.download_and_install(|_, _| {}, || {}).await?;
     let version = update.version;
     app.state::<Mutex<TrayState>>().lock().unwrap().update = Some(version.clone());
@@ -352,11 +407,20 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("Leuria: your AI for websites")
         .menu(&menu)
-        // Any click opens the menu; "Open Leuria" is its first item.
-        .show_menu_on_left_click(true)
+        // macOS: any click opens the menu; "Open Leuria" is its first item.
+        // Windows: a click opens the window, a right-click the menu.
+        .show_menu_on_left_click(cfg!(target_os = "macos"))
+        .on_tray_icon_event(|tray, event| {
+            if cfg!(target_os = "macos") {
+                return;
+            }
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                show_main(tray.app_handle());
+            }
+        })
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show_main(app),
-            "update" => app.restart(),
+            "update" => restart(app),
             "quit" => app.exit(0),
             // The window applies it (engine call, tray refresh), even while hidden.
             id => {
@@ -393,9 +457,13 @@ pub fn run() {
             token: admin_token(),
             port: Mutex::new(None),
             child: Mutex::new(None),
+            exited: Mutex::new(false),
         })
         .manage(Links(Mutex::new(Vec::new())))
-        .manage(Mutex::new(TrayState::default()))
+        .manage(Mutex::new(TrayState::default()));
+    #[cfg(windows)]
+    let app = app.manage(Downloaded(Mutex::new(None)));
+    let app = app
         .invoke_handler(tauri::generate_handler![engine_info, set_tray_models, restart_app, open_link, take_links, check_update, pending_update])
         .setup(|app| {
             build_tray(app.handle())?;
@@ -432,11 +500,7 @@ pub fn run() {
         .expect("error while building Leuria");
 
     app.run(|app, event| match event {
-        RunEvent::Exit => {
-            if let Some(child) = app.state::<Engine>().child.lock().unwrap().take() {
-                let _ = child.kill();
-            }
-        }
+        RunEvent::Exit => stop_engine(app),
         // macOS: clicking the app again (Finder, Spotlight) reopens the window.
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => show_main(app),

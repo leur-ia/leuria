@@ -50,7 +50,11 @@ open "http://localhost:1420/preview.html?port=19571&token=$TOKEN"          # add
 ## Build
 
 ```sh
-pnpm desktop:build        # .app and .dmg on macOS, .msi/.exe on Windows
+pnpm desktop:build        # .app and .dmg on macOS, a -setup.exe installer on Windows
 ```
 
-Not done yet: signing and notarization (Apple Developer ID, Windows code signing), the updater, and release CI.
+On Windows the installer installs for the current user, without administrator rights, and registers `leuria://` links (`src-tauri/tauri.windows.conf.json`).
+
+## Release
+
+`.github/workflows/release.yml` runs on a `v*` tag and builds a draft release: the Mac apps (ad-hoc signed) and the Windows installer, with the update file (`latest.json`) running apps check. On Windows it builds in three steps, the app, then its installer, then the update signature, so that code signing (through SignPath, when the repository's `SIGNPATH_*` settings are set) covers the programs, the installer, and what updates verify.

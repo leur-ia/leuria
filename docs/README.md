@@ -10,7 +10,7 @@ Leuria lets a website offer AI features that run on the visitor's own AI, instea
 - Guides: [providers and the cascade](developers/guides/providers.md), [conversations](developers/guides/conversations.md), [tools](developers/guides/tools.md), [structured output](developers/guides/structured-output.md), [embeddings and search](developers/guides/embeddings.md), [the Connect UI](developers/guides/connect-ui.md), [React](developers/guides/react.md), [your own provider](developers/guides/custom-providers.md).
 - [Going to production](developers/production.md): the cascade to ship, what visitors see, privacy, CSP, tool safety.
 - [Examples](developers/examples/index.md): small recipes you can run with your own AI on the portal.
-- [Run Leuria from a terminal](developers/cli.md): the engine without the app, to test your site, in CI, or on Windows and Linux.
+- [Run Leuria from a terminal](developers/cli.md): the engine without the app, to test your site, in CI, or on Linux.
 - [Engine protocol](developers/protocol.md): the HTTP, SSE and WebSocket API between pages and the engine, for writing another client.
 
 ## Use Leuria

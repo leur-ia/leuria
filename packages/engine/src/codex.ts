@@ -68,6 +68,10 @@ async function prepareCodexHome(agent: InstalledAgent): Promise<void> {
 		"[features]",
 		...features.map((name) => `${name} = ${ENABLED_FEATURES.has(name)}`),
 		"",
+		// Windows: the sandbox that needs no administrator rights (a restricted token).
+		// The other one asks for them the first time: out of the blue, and a dead end
+		// on a work computer without them.
+		...(process.platform === "win32" ? ["[windows]", 'sandbox = "unelevated"', ""] : []),
 	];
 	writeFileSync(join(home, "config.toml"), lines.join("\n"), { mode: 0o600 });
 	writeFileSync(stamp, agent.version);

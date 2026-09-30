@@ -37,6 +37,7 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.5.0",
     "cacache": "^21.0.1",
+    "cross-spawn": "^7.0.6",
     "giget": "^3.3.1",
     "ipaddr.js": "^2.5.0",
     "ws": "^8.18.0",
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "@types/cacache": "^20.0.1",
+    "@types/cross-spawn": "^6.0.6",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.0",
     "tsup": "^8.4.0",

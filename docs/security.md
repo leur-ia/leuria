@@ -15,7 +15,7 @@ This is the working threat model. Every website is untrusted until the visitor a
 | DNS rebinding | Loopback bind plus a `Host` check | `server.ts` |
 | A site picks the command to run | `prepare` ignores `agent` and `agentArgs`. The agent comes from the visitor's config | `routes.ts`, `agents.ts` |
 | The agent uses the visitor's machine (Claude) | No built-in tools, no settings or plugins, and an empty temporary folder. Permission requests for anything but page tools are refused | `policy.ts` |
-| The agent uses the visitor's machine (Codex) | Leuria's own `CODEX_HOME` holding only the sign-in and a generated config. That config sets a read-only sandbox and no web search, and turns off every feature of the pinned version except the code-mode host. `HOME` points at the empty sandbox, and the page tools are the only MCP server | `codex.ts` |
+| The agent uses the visitor's machine (Codex) | Leuria's own `CODEX_HOME` holding only the sign-in and a generated config. That config sets a read-only sandbox (on Windows, Codex's sandbox that needs no administrator rights) and no web search, and turns off every feature of the pinned version except the code-mode host. `HOME` points at the empty sandbox, and the page tools are the only MCP server | `codex.ts` |
 | A site reads another site's sessions | Sessions are keyed by origin; other origins get `404` | `routes.ts` |
 | A site spawns agents in a loop | At most 4 live sessions per origin | `session-manager.ts` |
 | Token theft from disk | Only SHA-256 hashes are stored, in files readable by the user only | `grants.ts`, `home.ts` |

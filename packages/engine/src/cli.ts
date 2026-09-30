@@ -231,7 +231,12 @@ function sites(args: string[]): void {
 /** Open a page in the visitor's browser (best effort: the terminal shows the link too). */
 function openInBrowser(url: string): void {
 	const [command, args] =
-		process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
+		process.platform === "darwin"
+			? ["open", [url]]
+			: // Not `cmd /c start`: cmd would read the & between query parameters as a new command.
+				process.platform === "win32"
+				? ["rundll32", ["url.dll,FileProtocolHandler", url]]
+				: ["xdg-open", [url]];
 	try {
 		const child = spawn(command, args as string[], { stdio: "ignore", detached: true });
 		child.on("error", () => undefined);
@@ -393,14 +398,21 @@ async function startForApp(config: EngineConfig, verbose: boolean, devPairing: b
 	setTimeout(updateAis, AI_UPDATE_DELAY_MS).unref();
 	setInterval(updateAis, AI_UPDATE_EVERY_MS).unref();
 
+	let stopping = false;
 	const shutdown = async () => {
+		if (stopping) return;
+		stopping = true;
 		await engine.close();
 		process.exit(0);
 	};
 	process.on("SIGINT", shutdown);
 	process.on("SIGTERM", shutdown);
-	// The app owns us: when it goes away, stdin closes.
+	// The app owns us: when it goes away, stdin closes. Before it quits or
+	// updates, it asks us to stop with a "quit" line, so the AIs we started stop too.
 	process.stdin.on("end", shutdown);
+	process.stdin.on("data", (chunk: Buffer) => {
+		if (chunk.toString("utf-8").split(/\r?\n/).includes("quit")) void shutdown();
+	});
 	process.stdin.resume();
 }
 
