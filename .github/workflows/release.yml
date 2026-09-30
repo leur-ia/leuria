@@ -271,8 +271,9 @@ jobs:
           for build in "x64 x86_64 " "arm64 aarch64 -arm"; do
             read -r arch platform suffix <<< "$build"
             dir="windows/windows-$arch"
-            installer=$(ls "$dir"/*-setup.exe)
-            msi=$(ls "$dir"/*.msi)
+            # The setup program and the MSI come from different bundle folders (nsis/, msi/).
+            installer=$(find "$dir" -name '*-setup.exe')
+            msi=$(find "$dir" -name '*.msi')
             # Stable names too, so leuria.eu can link to .../latest/download/Leuria-windows-setup.exe.
             cp "$installer" "Leuria-windows$suffix-setup.exe"
             cp "$msi" "Leuria-windows$suffix.msi"
