@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.9.0.schema.json
 PackageIdentifier: Leuria.Leuria
-PackageVersion: 0.1.3
+PackageVersion: 0.1.4
 InstallerType: nullsoft
 Scope: user
 InstallModes:
@@ -12,7 +12,10 @@ Protocols:
 ReleaseDate: 2026-09-30
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/leur-ia/leuria/releases/download/v0.1.3/Leuria_0.1.3_x64-setup.exe
-    InstallerSha256: 479715B87705A1C031D2477CFA090A6E1C0D93B13984564652E604C8F9801E1D
+    InstallerUrl: https://github.com/leur-ia/leuria/releases/download/v0.1.4/Leuria_0.1.4_x64-setup.exe
+    InstallerSha256: B5EAF5800F4D3C93280425C66E5D3E46C06918416942619CE1D114B0519D436E
+  - Architecture: arm64
+    InstallerUrl: https://github.com/leur-ia/leuria/releases/download/v0.1.4/Leuria_0.1.4_arm64-setup.exe
+    InstallerSha256: 518CB7FD15D1E9D9F347481D875385010AA65553E0540473BA7695343382B0E5
 ManifestType: installer
 ManifestVersion: 1.9.0
