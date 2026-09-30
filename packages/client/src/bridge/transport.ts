@@ -168,6 +168,19 @@ function needsQuery(needs: SiteNeeds | undefined): Record<string, string> {
 	};
 }
 
+/**
+ * Whether Leuria can run on this device. It runs on computers (Mac,
+ * Windows, Linux), not yet on phones or tablets: there, a `leuria://` link
+ * only shows the browser's "invalid address" error.
+ */
+export function leuriaRunsHere(): boolean {
+	if (typeof navigator === "undefined") return true;
+	const ua = navigator.userAgent;
+	if (/iPhone|iPad|iPod|Android/i.test(ua)) return false;
+	// iPadOS asks for desktop sites as a Mac: a "Mac" with a touch screen is an iPad.
+	return !(/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+
 /** Follow a `leuria://` link from this page, as a click on a link would: the system opens the app. */
 function followLink(url: string): void {
 	if (typeof document === "undefined") return;
@@ -238,6 +251,8 @@ export class BridgeClient {
 	 * {@link LeuriaNotConnectedError} when the visitor said no.
 	 */
 	async connect(options: ConnectOptions = {}): Promise<void> {
+		// On a phone or tablet there is no Leuria to open: say so at once, without a link the browser can't follow.
+		if (!leuriaRunsHere()) throw new LeuriaNotRunningError();
 		const nonce = newNonce();
 		const origin = typeof location === "undefined" ? undefined : location.origin;
 		if (options.openLink !== false && origin) {

@@ -1,6 +1,6 @@
 {
   "name": "@leuria/connect",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Leuria's Connect UI as web components: the \"Connect your AI\" button, the AI status and the Leuria badge, in Leuria Pearl, for any framework.",
   "license": "Apache-2.0",
   "type": "module",

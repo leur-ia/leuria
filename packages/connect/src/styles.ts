@@ -250,7 +250,8 @@ button, a { font: inherit; }
 .dialog-note { margin: var(--space-2) 0 0; font-size: 14px; line-height: 20px; color: var(--text-muted); }
 /* The alternatives: secondary, small, below the actions. */
 .instead { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2); font-size: 13px; line-height: 18px; color: var(--text-muted); }
-.instead[hidden] { display: none; }
+.instead[hidden],
+.dialog [hidden] { display: none; }
 .link { all: unset; color: var(--accent-text); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

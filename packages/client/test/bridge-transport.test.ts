@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { GrantStore } from "../../engine/src/grants.js";
 import { type EngineHandle, startEngine } from "../../engine/src/server.js";
-import { BridgeClient, type BridgeEvent, bridge, LeuriaNotConnectedError, LeuriaNotRunningError } from "../src/index.js";
+import { BridgeClient, type BridgeEvent, bridge, LeuriaNotConnectedError, LeuriaNotRunningError, leuriaRunsHere } from "../src/index.js";
 
 const PORT = 19598;
 const URL_ = `http://127.0.0.1:${PORT}`;
@@ -94,6 +94,30 @@ describe("BridgeClient", () => {
 		expect(link.protocol).toBe("leuria:");
 		expect(Object.fromEntries(link.searchParams)).toMatchObject({ origin: SITE, app: "Shop", tools: "1", effort: "light", context: "8000" });
 		expect(opened[1]).toBe(`leuria://site?origin=${encodeURIComponent(SITE)}`);
+	});
+
+	it("opens no link on a phone or tablet, and says at once that Leuria isn't there", async () => {
+		const phones = [
+			{ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", maxTouchPoints: 5 },
+			{ userAgent: "Mozilla/5.0 (Linux; Android 15; Pixel 9)", maxTouchPoints: 5 },
+			{ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", maxTouchPoints: 5 }, // an iPad asking for desktop sites
+		];
+		const real = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+		try {
+			for (const navigator of phones) {
+				Object.defineProperty(globalThis, "navigator", { value: navigator, configurable: true });
+				expect(leuriaRunsHere()).toBe(false);
+				const opened: string[] = [];
+				const leuria = new BridgeClient({ url: "http://127.0.0.1:1", storage: memoryStorage() });
+				await expect(leuria.connect({ openLink: (url) => opened.push(url), reachMs: 5_000 })).rejects.toBeInstanceOf(LeuriaNotRunningError);
+				expect(opened).toEqual([]);
+			}
+			Object.defineProperty(globalThis, "navigator", { value: { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", maxTouchPoints: 0 }, configurable: true });
+			expect(leuriaRunsHere()).toBe(true);
+		} finally {
+			if (real) Object.defineProperty(globalThis, "navigator", real);
+			else delete (globalThis as { navigator?: unknown }).navigator;
+		}
 	});
 
 	it("says Leuria isn't running when a connect gets no answer", async () => {

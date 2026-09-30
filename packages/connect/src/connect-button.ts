@@ -1,4 +1,4 @@
-import { type Connection, type ConnectionState, connection, type Leuria } from "@leuria/client";
+import { type Connection, type ConnectionState, connection, type Leuria, leuriaRunsHere } from "@leuria/client";
 
 import { LeuriaElement } from "./element.js";
 import { esc, icon, mark, statusMark } from "./icons.js";
@@ -95,6 +95,7 @@ export class LeuriaConnectButton extends LeuriaElement {
 		this.download = this.shadow.querySelector(".download")!;
 		this.download.href = DOWNLOAD_URL;
 		this.instead = this.shadow.querySelector(".instead")!;
+		if (!leuriaRunsHere()) this.forPhones();
 
 		this.button.addEventListener("click", () => this.onClick());
 		this.menu.addEventListener("toggle", (event) => {
@@ -116,6 +117,8 @@ export class LeuriaConnectButton extends LeuriaElement {
 			} else if (action === "connect") {
 				this.flow?.connect();
 				this.dialog.close();
+			} else if (action === "share") {
+				void navigator.share?.({ title: document.title, url: location.href }).catch(() => undefined);
 			} else if (action === "instead") {
 				const id = (event.target as Element).closest<HTMLElement>("[data-provider]")?.dataset.provider;
 				if (id) this.flow?.chooseInstead(id);
@@ -126,6 +129,25 @@ export class LeuriaConnectButton extends LeuriaElement {
 		this.dialog.addEventListener("click", (event) => {
 			if (event.target === this.dialog) this.dialog.close();
 		});
+	}
+
+	/**
+	 * On a phone or tablet Leuria can't run yet: the dialog says it works on
+	 * a computer, and offers to send this page there, instead of a download.
+	 */
+	private forPhones(): void {
+		const q = <T extends HTMLElement>(selector: string) => this.shadow.querySelector<T>(selector)!;
+		q(".dialog-title").textContent = "Leuria works on a computer";
+		q(".dialog-desc").textContent =
+			"It runs next to your AI on a Mac or a Windows PC, not on a phone or tablet yet. Open this page on your computer to use your own AI here.";
+		q(".steps").hidden = true;
+		q(".dialog-note").hidden = true;
+		const again = q<HTMLButtonElement>("[data-action=connect]");
+		if (typeof navigator.share === "function") {
+			again.dataset.action = "share";
+			again.textContent = "Send this page to my computer";
+		} else again.hidden = true;
+		this.download.textContent = "About Leuria";
 	}
 
 	protected watch(client: Leuria): () => void {

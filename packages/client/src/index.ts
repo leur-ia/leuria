@@ -50,7 +50,7 @@ export type { BrowserAIOptions } from "./providers/browser.js";
 export { server, ServerProvider, sseData } from "./providers/server.js";
 export type { ServerProviderOptions } from "./providers/server.js";
 
-export { BridgeClient, BridgeSession, DEFAULT_URL, LeuriaNotConnectedError, LeuriaNotRunningError } from "./bridge/transport.js";
+export { BridgeClient, BridgeSession, DEFAULT_URL, LeuriaNotConnectedError, LeuriaNotRunningError, leuriaRunsHere } from "./bridge/transport.js";
 export type {
 	BridgeAttachment,
 	BridgeClientOptions,
