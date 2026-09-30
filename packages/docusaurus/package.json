@@ -9,7 +9,7 @@
     "url": "git+https://github.com/leur-ia/leuria.git",
     "directory": "packages/docusaurus"
   },
-  "homepage": "https://leuria.dev",
+  "homepage": "https://leuria.dev/docs/developers/docusaurus",
   "keywords": ["docusaurus", "docusaurus-plugin", "ai", "ask-ai", "search", "webmcp"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

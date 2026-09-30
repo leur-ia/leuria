@@ -11,6 +11,24 @@ const demosUrl = "https://demo.leuria.dev";
 const repoDir = fileURLToPath(new URL("../..", import.meta.url));
 const docsDir = fileURLToPath(new URL("../../docs", import.meta.url));
 
+/**
+ * Search and share metadata for the pages people land on from outside. The docs
+ * are plain Markdown that must read well on GitHub, so it lives here instead of
+ * in front matter. Keyed by the path under docs/.
+ */
+const pageMeta: Record<string, { description: string; keywords?: string[]; image?: string }> = {
+	"developers/docusaurus.md": {
+		description:
+			"Add an Ask AI assistant to your Docusaurus site that answers from your pages, on each reader's own AI (ChatGPT, Claude, Mistral or a local model). No API keys, nothing to pay per question.",
+		keywords: ["docusaurus", "docusaurus plugin", "ask ai", "docs assistant", "ai search", "webmcp", "bring your own ai"],
+		image: "img/social/docusaurus.jpg",
+	},
+	"developers/quickstart.md": {
+		description: "Add an AI feature to your website that runs on your visitor's own AI: plain HTML, React or assistant-ui, in a few lines.",
+		keywords: ["ai sdk", "bring your own ai", "browser ai", "react", "assistant-ui"],
+	},
+};
+
 const config: Config = {
 	title: "Leuria",
 	tagline: "Bring your own AI to the web",
@@ -27,6 +45,12 @@ const config: Config = {
 		format: "detect",
 		mermaid: true,
 		hooks: { onBrokenMarkdownLinks: "throw" },
+		parseFrontMatter: async (params) => {
+			const result = await params.defaultParseFrontMatter(params);
+			const meta = pageMeta[params.filePath.slice(docsDir.length).replace(/^[\\/]/, "").replaceAll("\\", "/")];
+			if (meta) result.frontMatter = { ...meta, ...result.frontMatter };
+			return result;
+		},
 	},
 	// Cascade layers are off: for this site's browser targets the build replaces
 	// them with specificity boosts, and Infima's then beat custom.css.
@@ -95,6 +119,11 @@ const config: Config = {
 	],
 
 	themeConfig: {
+		image: "img/social/leuria-dev.jpg",
+		metadata: [
+			{ name: "keywords", content: "bring your own ai, ai sdk, browser ai, webmcp, docusaurus plugin, ai features, no api keys" },
+			{ name: "twitter:card", content: "summary_large_image" },
+		],
 		colorMode: { respectPrefersColorScheme: true },
 		navbar: {
 			title: "leuria",
