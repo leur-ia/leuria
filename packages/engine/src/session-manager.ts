@@ -20,7 +20,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -31,6 +31,7 @@ import { LlmSession } from "./llm/llm-session.js";
 import type { LlmProvider } from "./llm/providers.js";
 import type { Logger } from "./logger.js";
 import { WEBMCP_SERVER_NAME } from "./policy.js";
+import { removeScratch } from "./scratch.js";
 import { type SkillContent, skillsPrompt } from "./skills.js";
 import type { WebMcpServer } from "./webmcp-server.js";
 
@@ -504,14 +505,12 @@ export class SessionManager {
 		this.options.webMcpServer.removeChannel(session.id);
 		// Keep the final status readable for a while, then forget it.
 		setTimeout(() => this.sessions.delete(session.id), FORGET_AFTER_MS).unref();
-		try {
-			rmSync(session.cwd, { recursive: true, force: true });
-		} catch (err) {
+		removeScratch(session.cwd, (err) =>
 			this.options.logger.warn("failed to remove sandbox", {
 				cwd: session.cwd,
 				err: err instanceof Error ? err.message : String(err),
-			});
-		}
+			}),
+		);
 	}
 
 	private notify(session: Session, event: string, data: unknown): void {

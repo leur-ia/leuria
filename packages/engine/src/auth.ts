@@ -14,13 +14,14 @@
  */
 
 import crossSpawn from "cross-spawn";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { type AgentInfo, type AgentModels, AcpLiveSession } from "./acp/acp-client.js";
 import { homePath, loadConfig, readJson, rememberReady, writeJson } from "./home.js";
 import { agentName, ensureAgent } from "./agents.js";
+import { removeScratch } from "./scratch.js";
 import { catchBrowserLinks } from "./browser-link.js";
 import { defaultModel, getProvider, isLlmId, listModels, parseLlmId } from "./llm/providers.js";
 import { profileFor } from "./profiles.js";
@@ -153,7 +154,7 @@ async function open(id: string, onProgress?: (message: string) => void, terminal
 	});
 	const close = () => {
 		session.close();
-		rmSync(sandbox, { recursive: true, force: true });
+		removeScratch(sandbox);
 	};
 	return { agent, session, close, env, sandbox };
 }
