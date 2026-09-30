@@ -1,6 +1,6 @@
 {
   "name": "@leuria/desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Leuria desktop app: the engine, a tray icon, onboarding and site approvals.",
   "license": "Apache-2.0",
