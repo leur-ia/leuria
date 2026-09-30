@@ -167,16 +167,22 @@ jobs:
           # Signs updates (the installer's .sig, which running apps check).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri bundle --target "$TARGET" --bundles nsis --config src-tauri/tauri.release.conf.json
+        run: pnpm tauri bundle --target "$TARGET" --bundles nsis,msi --config src-tauri/tauri.release.conf.json
 
-      - name: Find the installer
+      # Two installers: the setup program most people get (for them alone, no
+      # administrator), and an MSI for companies that install for everyone.
+      - name: Find the installers
         id: installer
         run: |
           path=$(ls "apps/desktop/src-tauri/target/$TARGET/release/bundle/nsis/"*-setup.exe)
+          msi=$(ls "apps/desktop/src-tauri/target/$TARGET/release/bundle/msi/"*.msi)
           {
             echo "path=$path"
             echo "dir=$(dirname "$path")"
             echo "name=$(basename "$path")"
+            echo "msi=$msi"
+            echo "msi-dir=$(dirname "$msi")"
+            echo "msi-name=$(basename "$msi")"
           } >> "$GITHUB_OUTPUT"
       - name: Upload the installer to sign
         id: unsigned-installer
@@ -184,7 +190,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installer
-          path: ${{ steps.installer.outputs.path }}
+          path: |
+            ${{ steps.installer.outputs.path }}
+            ${{ steps.installer.outputs.msi }}
       - name: Sign the installer
         if: env.SIGN == 'true'
         uses: signpath/github-action-submit-signing-request@v3
@@ -209,8 +217,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           installer="$GITHUB_WORKSPACE/${{ steps.installer.outputs.path }}"
+          msi="$GITHUB_WORKSPACE/${{ steps.installer.outputs.msi }}"
           cp "$GITHUB_WORKSPACE/signed/installer/${{ steps.installer.outputs.name }}" "$installer"
+          cp "$GITHUB_WORKSPACE/signed/installer/${{ steps.installer.outputs.msi-name }}" "$msi"
           pnpm tauri signer sign --app-version "${{ steps.version.outputs.version }}" "$installer"
+          pnpm tauri signer sign --app-version "${{ steps.version.outputs.version }}" "$msi"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -218,6 +229,8 @@ jobs:
           path: |
             ${{ steps.installer.outputs.dir }}/${{ steps.installer.outputs.name }}
             ${{ steps.installer.outputs.dir }}/${{ steps.installer.outputs.name }}.sig
+            ${{ steps.installer.outputs.msi-dir }}/${{ steps.installer.outputs.msi-name }}
+            ${{ steps.installer.outputs.msi-dir }}/${{ steps.installer.outputs.msi-name }}.sig
 
   # After the Mac builds, which create the draft release and its latest.json:
   # add the Windows installer and its update entry.
@@ -236,16 +249,23 @@ jobs:
           VERSION: ${{ needs.windows.outputs.version }}
         run: |
           installer=$(cd windows && ls -- *-setup.exe)
-          # A stable name too, so leuria.eu can link to .../latest/download/Leuria-windows-setup.exe.
+          msi=$(cd windows && ls -- *.msi)
+          # Stable names too, so leuria.eu can link to .../latest/download/Leuria-windows-setup.exe.
           cp "windows/$installer" Leuria-windows-setup.exe
-          gh release upload "v$VERSION" "windows/$installer" "windows/$installer.sig" Leuria-windows-setup.exe --clobber
+          cp "windows/$msi" Leuria-windows.msi
+          gh release upload "v$VERSION" "windows/$installer" "windows/$installer.sig" "windows/$msi" "windows/$msi.sig" \
+            Leuria-windows-setup.exe Leuria-windows.msi --clobber
 
           gh release download "v$VERSION" --pattern latest.json --dir .
           entry=$(jq -n --arg signature "$(cat "windows/$installer.sig")" \
             --arg url "https://github.com/$GH_REPO/releases/download/v$VERSION/$installer" \
             '{signature: $signature, url: $url}')
-          jq --argjson entry "$entry" \
-            '.platforms["windows-x86_64"] = $entry | .platforms["windows-x86_64-nsis"] = $entry' \
+          # An app installed from the MSI updates from the MSI, so it stays one install for everyone.
+          msi_entry=$(jq -n --arg signature "$(cat "windows/$msi.sig")" \
+            --arg url "https://github.com/$GH_REPO/releases/download/v$VERSION/$msi" \
+            '{signature: $signature, url: $url}')
+          jq --argjson entry "$entry" --argjson msi "$msi_entry" \
+            '.platforms["windows-x86_64"] = $entry | .platforms["windows-x86_64-nsis"] = $entry | .platforms["windows-x86_64-msi"] = $msi' \
             latest.json > latest.next.json
           mv latest.next.json latest.json
           gh release upload "v$VERSION" latest.json --clobber

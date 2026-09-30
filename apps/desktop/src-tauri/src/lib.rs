@@ -6,6 +6,8 @@
 //! onboarding, sign-in, sites, approvals, goes from the UI to the engine's
 //! admin API.
 
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -114,6 +116,27 @@ fn take_links(links: tauri::State<'_, Links>) -> Vec<String> {
     std::mem::take(&mut *links.0.lock().unwrap())
 }
 
+/// The engine's warnings and errors, for when something fails on a visitor's
+/// computer: `~/.leuria/logs/engine.log` (under `LEURIA_HOME` when set), next
+/// to the engine's own files. A release app has no console to print them to.
+/// Started over once it passes 2 MB.
+fn open_engine_log(app: &AppHandle) -> Option<std::fs::File> {
+    let home = std::env::var_os("LEURIA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| app.path().home_dir().ok().map(|dir| dir.join(".leuria")))?;
+    let dir = home.join("logs");
+    std::fs::create_dir_all(&dir).ok()?;
+    let path = dir.join("engine.log");
+    let full = std::fs::metadata(&path).map(|m| m.len() > 2_000_000).unwrap_or(false);
+    std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(!full)
+        .truncate(full)
+        .open(path)
+        .ok()
+}
+
 /// Start the engine sidecar and relay its JSON-line events.
 fn start_engine(app: &AppHandle) -> tauri::Result<()> {
     let engine = app.state::<Engine>();
@@ -129,6 +152,7 @@ fn start_engine(app: &AppHandle) -> tauri::Result<()> {
         .expect("failed to start the Leuria engine");
     *engine.child.lock().unwrap() = Some(child);
 
+    let mut log = open_engine_log(app);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(event) = events.recv().await {
@@ -155,9 +179,16 @@ fn start_engine(app: &AppHandle) -> tauri::Result<()> {
                     }
                 }
                 CommandEvent::Stderr(line) => {
-                    eprintln!("[engine] {}", String::from_utf8_lossy(&line).trim_end());
+                    let line = String::from_utf8_lossy(&line);
+                    eprintln!("[engine] {}", line.trim_end());
+                    if let Some(file) = log.as_mut() {
+                        let _ = writeln!(file, "{}", line.trim_end());
+                    }
                 }
                 CommandEvent::Terminated(status) => {
+                    if let Some(file) = log.as_mut() {
+                        let _ = writeln!(file, "engine stopped ({:?})", status.code);
+                    }
                     *app.state::<Engine>().exited.lock().unwrap() = true;
                     let _ = app.emit("engine-exit", status.code);
                 }
