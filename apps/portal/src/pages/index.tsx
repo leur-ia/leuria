@@ -62,6 +62,11 @@ const DEMOS = [
 	},
 ];
 
+/** On a phone, offer to send this page to the visitor's computer, where Leuria runs. */
+function sendToComputer(): void {
+	void navigator.share?.({ title: "Leuria for developers", url: location.href }).catch(() => undefined);
+}
+
 function askAbout(question: string): void {
 	void import("@leuria/docs").then(({ openAsk }) => openAsk(question));
 }
@@ -84,6 +89,22 @@ export default function Home(): ReactNode {
 							Ask these docs with your AI
 						</button>
 					</div>
+				</section>
+
+				<section className={styles.phone} aria-labelledby="phone-title">
+					<div>
+						<h2 id="phone-title">Leuria runs on a computer</h2>
+						<p>
+							Your visitors' AI lives on their Mac or Windows PC, so Leuria does too: phones and tablets aren't supported yet. Here is a demo shop answering with ChatGPT and
+							filling in an order from a message.
+						</p>
+					</div>
+					<video className={styles.video} src="/video/leuria-demo.mp4" poster="/video/leuria-demo.jpg" autoPlay muted loop playsInline width={720} height={1440}>
+						A demo shop answering a question and filling in an order with the visitor's own AI.
+					</video>
+					<button type="button" className={styles.soft} onClick={sendToComputer}>
+						Send this page to my computer
+					</button>
 				</section>
 
 				<section className={styles.points}>

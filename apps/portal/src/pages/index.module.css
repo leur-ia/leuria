@@ -1,4 +1,7 @@
 .page {
+	/* The wrapper is a flex row: without a min-width, the code blocks' long lines widen the page past a phone's screen. */
+	width: 100%;
+	min-width: 0;
 	max-width: 1120px;
 	margin: 0 auto;
 	padding: 24px 24px 80px;
@@ -79,6 +82,39 @@
 }
 .soft:hover {
 	box-shadow: inset 0 0 0 1px var(--border-strong), var(--shadow-3);
+}
+
+/* Only on phones and tablets, where Leuria doesn't run: say so, and show it working. */
+.phone {
+	display: none;
+}
+@media (hover: none) and (pointer: coarse) {
+	.phone {
+		display: grid;
+		justify-items: start;
+		gap: 20px;
+		margin: -24px 0 56px;
+	}
+	.phone h2 {
+		margin: 0 0 8px;
+		font-size: 24px;
+		letter-spacing: -0.02em;
+		color: var(--ink);
+	}
+	.phone p {
+		margin: 0;
+		color: var(--text-muted);
+	}
+}
+.video {
+	display: block;
+	width: 100%;
+	max-width: 360px;
+	height: auto;
+	justify-self: center;
+	border-radius: var(--radius-5);
+	box-shadow: inset 0 0 0 1px var(--border), var(--shadow-3);
+	background: #f3efe8;
 }
 
 .points {
@@ -167,6 +203,6 @@
 		padding: 56px 24px;
 	}
 	.split {
-		grid-template-columns: 1fr;
+		grid-template-columns: minmax(0, 1fr);
 	}
 }
