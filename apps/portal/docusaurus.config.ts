@@ -33,6 +33,11 @@ const config: Config = {
 	title: "Leuria",
 	tagline: "Bring your own AI to the web",
 	favicon: "img/favicon.svg",
+	// Browsers without SVG icons (Safari) take the .ico; iPhones take the touch icon.
+	headTags: [
+		{ tagName: "link", attributes: { rel: "icon", href: "/favicon.ico", sizes: "32x32" } },
+		{ tagName: "link", attributes: { rel: "apple-touch-icon", href: "/img/apple-touch-icon.png" } },
+	],
 	url: "https://leuria.dev",
 	baseUrl: "/",
 	organizationName: "leur-ia",
