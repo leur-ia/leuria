@@ -81,11 +81,24 @@ jobs:
           gh release upload "v$version" "Leuria-mac-${{ matrix.name }}.dmg" --clobber
 
   windows:
-    runs-on: windows-latest
+    # Native builds: x64, and ARM64 for Windows on ARM (Snapdragon laptops,
+    # Windows in a virtual machine on an Apple Silicon Mac). Under emulation
+    # the x64 build can't set up the AI apps there.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            arch: x64
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     outputs:
       version: ${{ steps.version.outputs.version }}
     env:
-      TARGET: x86_64-pc-windows-msvc
+      TARGET: ${{ matrix.target }}
       # Code signing is on once the SignPath project exists (see the top of this file).
       SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
     defaults:
@@ -101,7 +114,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          targets: ${{ matrix.target }}
 
       - name: The tag matches the app's version
         id: version
@@ -136,7 +149,7 @@ jobs:
         if: env.SIGN == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-app
+          name: unsigned-app-${{ matrix.arch }}
           path: unsigned/app
       - name: Sign the programs
         if: env.SIGN == 'true'
@@ -189,7 +202,7 @@ jobs:
         if: env.SIGN == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-installer
+          name: unsigned-installer-${{ matrix.arch }}
           path: |
             ${{ steps.installer.outputs.path }}
             ${{ steps.installer.outputs.msi }}
@@ -225,7 +238,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windows
+          name: windows-${{ matrix.arch }}
           path: |
             ${{ steps.installer.outputs.dir }}/${{ steps.installer.outputs.name }}
             ${{ steps.installer.outputs.dir }}/${{ steps.installer.outputs.name }}.sig
@@ -240,32 +253,35 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: windows
+          pattern: windows-*
           path: windows
-      - name: Upload the installer, and add it to the update file
+      - name: Upload the installers, and add them to the update file
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.windows.outputs.version }}
         run: |
-          installer=$(cd windows && ls -- *-setup.exe)
-          msi=$(cd windows && ls -- *.msi)
-          # Stable names too, so leuria.eu can link to .../latest/download/Leuria-windows-setup.exe.
-          cp "windows/$installer" Leuria-windows-setup.exe
-          cp "windows/$msi" Leuria-windows.msi
-          gh release upload "v$VERSION" "windows/$installer" "windows/$installer.sig" "windows/$msi" "windows/$msi.sig" \
-            Leuria-windows-setup.exe Leuria-windows.msi --clobber
-
           gh release download "v$VERSION" --pattern latest.json --dir .
-          entry=$(jq -n --arg signature "$(cat "windows/$installer.sig")" \
-            --arg url "https://github.com/$GH_REPO/releases/download/v$VERSION/$installer" \
-            '{signature: $signature, url: $url}')
-          # An app installed from the MSI updates from the MSI, so it stays one install for everyone.
-          msi_entry=$(jq -n --arg signature "$(cat "windows/$msi.sig")" \
-            --arg url "https://github.com/$GH_REPO/releases/download/v$VERSION/$msi" \
-            '{signature: $signature, url: $url}')
-          jq --argjson entry "$entry" --argjson msi "$msi_entry" \
-            '.platforms["windows-x86_64"] = $entry | .platforms["windows-x86_64-nsis"] = $entry | .platforms["windows-x86_64-msi"] = $msi' \
-            latest.json > latest.next.json
-          mv latest.next.json latest.json
+          entry() {
+            jq -n --arg signature "$(cat "$1.sig")" \
+              --arg url "https://github.com/$GH_REPO/releases/download/v$VERSION/$(basename "$1")" \
+              '{signature: $signature, url: $url}'
+          }
+          # arch in the artifact name, platform key in latest.json, suffix of the stable names.
+          for build in "x64 x86_64 " "arm64 aarch64 -arm"; do
+            read -r arch platform suffix <<< "$build"
+            dir="windows/windows-$arch"
+            installer=$(ls "$dir"/*-setup.exe)
+            msi=$(ls "$dir"/*.msi)
+            # Stable names too, so leuria.eu can link to .../latest/download/Leuria-windows-setup.exe.
+            cp "$installer" "Leuria-windows$suffix-setup.exe"
+            cp "$msi" "Leuria-windows$suffix.msi"
+            gh release upload "v$VERSION" "$installer" "$installer.sig" "$msi" "$msi.sig" \
+              "Leuria-windows$suffix-setup.exe" "Leuria-windows$suffix.msi" --clobber
+            # An app installed from the MSI updates from the MSI, so it stays one install for everyone.
+            jq --argjson setup "$(entry "$installer")" --argjson msi "$(entry "$msi")" --arg p "windows-$platform" \
+              '.platforms[$p] = $setup | .platforms[$p + "-nsis"] = $setup | .platforms[$p + "-msi"] = $msi' \
+              latest.json > latest.next.json
+            mv latest.next.json latest.json
+          done
           gh release upload "v$VERSION" latest.json --clobber
