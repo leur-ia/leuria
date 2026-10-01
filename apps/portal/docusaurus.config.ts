@@ -163,6 +163,8 @@ const config: Config = {
 					items: [
 						{ label: "GitHub", href: repoUrl },
 						{ label: "Security", to: "/docs/security" },
+						{ label: "Privacy", href: "https://leuria.eu/privacy-policy" },
+						{ html: '<button type="button" class="footer__link-item footer-consent" data-consent-open>Visit counting</button>' },
 					],
 				},
 			],

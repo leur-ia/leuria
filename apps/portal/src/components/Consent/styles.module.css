@@ -1,0 +1,34 @@
+.consent {
+	position: fixed;
+	inset: auto 16px 16px;
+	z-index: 300;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px 20px;
+	max-width: 720px;
+	margin: 0 auto;
+	padding: 16px 20px;
+	border-radius: var(--radius-4, 16px);
+	background: var(--surface);
+	color: var(--text);
+	box-shadow: var(--shadow-4);
+	font-size: 14px;
+	line-height: 20px;
+}
+
+.consent p {
+	flex: 1 1 280px;
+	margin: 0;
+}
+
+.consent a {
+	color: var(--text-muted);
+	text-decoration: underline;
+}
+
+.actions {
+	display: flex;
+	gap: 8px;
+	margin-left: auto;
+}

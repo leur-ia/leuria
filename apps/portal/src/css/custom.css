@@ -88,3 +88,12 @@ body {
 	color: var(--accent-text);
 	font-weight: 600;
 }
+
+/* "Visit counting" in the footer: a button that looks like the links around it. */
+.footer-consent {
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	cursor: pointer;
+}
