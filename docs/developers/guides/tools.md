@@ -47,7 +47,7 @@ const chat = ai.conversation({
 ## Tool context
 
 `execute(args, ctx)` gets the following:
-- `ctx.context`: the turn's context from `send(text, { context })` (see [Conversations](conversations.md#turn-context)). The model never sets it, so a tool bound to an account can't be pointed at another one.
+- `ctx.context`: the turn's context from `send(text, { context })` (see [Conversations](conversations.md#turn-context)). The model never sets it, so a tool bound to one customer can't be pointed at another one.
 - `ctx.callCount`: how many times this tool has run in this turn, this call included, for bounded retries: e.g. reject twice, then stop.
 - `ctx.callId` and `ctx.turnId`.
 - `ctx.signal`: aborted when the turn is cancelled, times out or ends.

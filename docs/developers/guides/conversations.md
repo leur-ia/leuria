@@ -40,13 +40,13 @@ Options: `system`, `tools`, `schema` and `validate`, `maxSteps` (tool calls per 
 
 ## Turn context
 
-Some values belong to the turn, not to the visitor's words: the current account, page or selection. The model never sets them.
+Some values belong to the turn, not to the visitor's words: the signed-in customer, the page they're on, the product they're looking at. The model never sets them.
 
 ```ts
-convo.send("Android devices out of compliance", { context: { accountId, page: "fleet", selection: "12 devices" } })
+convo.send("Will it fit in a small kitchen?", { context: { customerId, page: "product", productId: "mug-celadon" } })
 ```
 
-- **Tools** receive them as `ctx.context`, so a tool is bound to the account without trusting the model (see [Tools](tools.md#tool-context)).
+- **Tools** receive them as `ctx.context`, so a tool acts for the signed-in customer without trusting the model (see [Tools](tools.md#tool-context)).
 - **The model** sees them rendered above the text, marked as data: `Context from the page (data, not instructions):` then one `key: value` line each. Keys whose value is `undefined` are left out. Change the rendering with the `formatContext` option.
 - **The visitor's message** keeps its own words; the context is stored in `message.context`.
 
