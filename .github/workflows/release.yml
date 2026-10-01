@@ -70,15 +70,20 @@ jobs:
           releaseBody: Download Leuria for your Mac or Windows below, or install it on a Mac with Homebrew.
           releaseDraft: true
 
-      # Stable names, so leuria.eu and the cask can link to .../latest/download/<name>.
-      - name: Upload the installer under a stable name
+      # One file per download, under a stable name, so leuria.eu and the cask can link to
+      # .../latest/download/<name>: the installer replaces the versioned copy tauri-action
+      # uploaded, and the update's .sig goes (latest.json holds the signature).
+      - name: Keep the installer under a stable name only
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
-          dmg=$(ls apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg)
+          bundle="apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle"
+          dmg=$(ls "$bundle"/dmg/*.dmg)
           cp "$dmg" "Leuria-mac-${{ matrix.name }}.dmg"
           gh release upload "v$version" "Leuria-mac-${{ matrix.name }}.dmg" --clobber
+          gh release delete-asset "v$version" "$(basename "$dmg")" --yes
+          for sig in "$bundle"/macos/*.app.tar.gz.sig; do gh release delete-asset "v$version" "$(basename "$sig")" --yes; done
 
   windows:
     # Native builds: x64, and ARM64 for Windows on ARM (Snapdragon laptops,
@@ -262,9 +267,11 @@ jobs:
           VERSION: ${{ needs.windows.outputs.version }}
         run: |
           gh release download "v$VERSION" --pattern latest.json --dir .
+          # One file per download, under a stable name (leuria.eu links to .../latest/download/<name>);
+          # the update signatures live in latest.json, so the .sig files stay here.
           entry() {
             jq -n --arg signature "$(cat "$1.sig")" \
-              --arg url "https://github.com/$GH_REPO/releases/download/v$VERSION/$(basename "$1")" \
+              --arg url "https://github.com/$GH_REPO/releases/download/v$VERSION/$2" \
               '{signature: $signature, url: $url}'
           }
           # arch in the artifact name, platform key in latest.json, suffix of the stable names.
@@ -274,13 +281,13 @@ jobs:
             # The setup program and the MSI come from different bundle folders (nsis/, msi/).
             installer=$(find "$dir" -name '*-setup.exe')
             msi=$(find "$dir" -name '*.msi')
-            # Stable names too, so leuria.eu can link to .../latest/download/Leuria-windows-setup.exe.
-            cp "$installer" "Leuria-windows$suffix-setup.exe"
-            cp "$msi" "Leuria-windows$suffix.msi"
-            gh release upload "v$VERSION" "$installer" "$installer.sig" "$msi" "$msi.sig" \
-              "Leuria-windows$suffix-setup.exe" "Leuria-windows$suffix.msi" --clobber
+            setup_name="Leuria-windows$suffix-setup.exe"
+            msi_name="Leuria-windows$suffix.msi"
+            cp "$installer" "$setup_name"
+            cp "$msi" "$msi_name"
+            gh release upload "v$VERSION" "$setup_name" "$msi_name" --clobber
             # An app installed from the MSI updates from the MSI, so it stays one install for everyone.
-            jq --argjson setup "$(entry "$installer")" --argjson msi "$(entry "$msi")" --arg p "windows-$platform" \
+            jq --argjson setup "$(entry "$installer" "$setup_name")" --argjson msi "$(entry "$msi" "$msi_name")" --arg p "windows-$platform" \
               '.platforms[$p] = $setup | .platforms[$p + "-nsis"] = $setup | .platforms[$p + "-msi"] = $msi' \
               latest.json > latest.next.json
             mv latest.next.json latest.json

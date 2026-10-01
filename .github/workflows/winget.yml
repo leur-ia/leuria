@@ -24,7 +24,7 @@ jobs:
         uses: vedantmgoyal9/winget-releaser@main
         with:
           identifier: Leuria.Leuria
-          # The versioned setup programs (x64 and ARM64) only: not the stable-name copies, nor the MSIs.
-          installers-regex: '_(x64|arm64)-setup\.exe$'
+          # The setup programs (x64 and ARM64), not the MSIs.
+          installers-regex: '^Leuria-windows(-arm)?-setup\.exe$'
           release-tag: ${{ github.event.release.tag_name || inputs.tag }}
           token: ${{ secrets.WINGET_ACC_TOKEN }}
