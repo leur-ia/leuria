@@ -78,7 +78,7 @@ An `Origin` that is not `http:` or `https:` gets `403 { "error": "origin not all
 
 **Authentication.** A page sends its grant token as `Authorization: Bearer <token>`. A page without a valid token gets `401 { "error": "…", "code": "not_paired" }` on every route that needs one.
 
-**Silence.** The desktop app's engine answers no page it doesn't know, so a site can't tell that Leuria is installed. A web origin gets an empty `403` with no CORS headers (the browser then fails the request, exactly as when nothing listens), unless:
+<a id="silence"></a>**Silence.** The desktop app's engine answers no page it doesn't know, so a site can't tell that Leuria is installed. A web origin gets an empty `403` with no CORS headers (the browser then fails the request, exactly as when nothing listens), unless:
 - the visitor connected it (it has a grant), or
 - a `leuria://connect` link named it and the answer hasn't been collected yet.
 

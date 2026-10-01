@@ -71,6 +71,10 @@ const order = await ai.chat({ prompt: message, schema: orderSchema }).object()
 
 Next: the [Quickstart](docs/developers/quickstart.md) (plain HTML, a bundler, React), the [SDK overview](docs/developers/sdk.md) and its guides (the fallback order, conversations, page tools, structured output, search by meaning), and [Going to production](docs/developers/production.md).
 
+### Already writing for the Prompt API?
+
+Keep your `LanguageModel` code: [`@leuria/prompt-api`](docs/developers/prompt-api.md) makes it work where the browser has no built-in model, on the visitor's own AI.
+
 ### A docs site?
 
 Docusaurus sites get Ask AI, on each reader's own AI, with one plugin: [`@leuria/docusaurus`](docs/developers/docusaurus.md).
@@ -125,6 +129,7 @@ Choose your AI in the app. When a site offers **Connect your AI**, Leuria asks y
 | --- | --- | --- |
 | `packages/client` | [`@leuria/client`](packages/client) | The SDK for your page |
 | `packages/connect` | [`@leuria/connect`](packages/connect) | The Connect button and status, as web components |
+| `packages/prompt-api` | [`@leuria/prompt-api`](packages/prompt-api) | The Prompt API (`LanguageModel`) where the browser can't run it |
 | `packages/react` | [`@leuria/react`](packages/react) | React hooks |
 | `packages/react-connect` | [`@leuria/react-connect`](packages/react-connect) | The Connect button and status, as React components |
 | `packages/store` | [`@leuria/store`](packages/store) | Search by meaning in the visitor's browser |

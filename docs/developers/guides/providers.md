@@ -53,6 +53,8 @@ The page never needs to know which provider answered, but it can: every run star
 - `languages`: e.g. `["en"]`, for the model's expected inputs and outputs.
 - `id` (default `browser`), `label`.
 
+To write a feature for the Prompt API itself, and have the visitor's AI answer where the browser has no model, see [The Prompt API, in every browser](../prompt-api.md).
+
 **`server(options)`**: your own endpoint that speaks the OpenAI Chat Completions API with streaming, and adds the API key on the server. Never put a key in the page. Tools still run in the page.
 - `url` (required), `model`, `headers` (an object, or a function called per request).
 - `jsonSchema`: supports `response_format: { type: "json_schema" }`. Default false.

@@ -23,6 +23,11 @@ const pageMeta: Record<string, { description: string; keywords?: string[]; image
 		keywords: ["docusaurus", "docusaurus plugin", "ask ai", "docs assistant", "ai search", "webmcp", "bring your own ai"],
 		image: "img/social/docusaurus.jpg",
 	},
+	"developers/prompt-api.md": {
+		description:
+			"Write AI features for the Prompt API (LanguageModel) and run them in every browser: the browser's built-in model where it can run, the visitor's own AI through Leuria elsewhere.",
+		keywords: ["prompt api", "LanguageModel", "polyfill", "built-in ai", "gemini nano", "chrome ai", "bring your own ai"],
+	},
 	"developers/quickstart.md": {
 		description: "Add an AI feature to your website that runs on your visitor's own AI: plain HTML, React or assistant-ui, in a few lines.",
 		keywords: ["ai sdk", "bring your own ai", "browser ai", "react", "assistant-ui"],

@@ -6,6 +6,7 @@ Leuria lets a website offer AI features that run on the visitor's own AI, instea
 
 - [Quickstart](developers/quickstart.md): a first AI feature in plain HTML, with a bundler, or in React.
 - [The core SDK](developers/sdk.md): how `@leuria/client` fits together, and where to go next.
+- [The Prompt API, in every browser](developers/prompt-api.md): write for `LanguageModel`, the web standard, and the visitor's own AI answers where the browser has no model.
 - [Ask AI for your Docusaurus site](developers/docusaurus.md): an assistant and search by meaning for your docs, on each reader's own AI.
 - Guides: [providers and the cascade](developers/guides/providers.md), [conversations](developers/guides/conversations.md), [tools](developers/guides/tools.md), [structured output](developers/guides/structured-output.md), [embeddings and search](developers/guides/embeddings.md), [the Connect UI](developers/guides/connect-ui.md), [React](developers/guides/react.md), [your own provider](developers/guides/custom-providers.md).
 - [Going to production](developers/production.md): the cascade to ship, what visitors see, privacy, CSP, tool safety.
