@@ -102,7 +102,7 @@ const config: Config = {
 			{
 				id: "typedoc",
 				entryPointStrategy: "packages",
-				entryPoints: ["client", "react", "connect", "react-connect", "store", "web-embed", "docs", "docusaurus"].map((name) => `../../packages/${name}`),
+				entryPoints: ["client", "prompt-api", "react", "connect", "react-connect", "store", "web-embed", "docs", "docusaurus"].map((name) => `../../packages/${name}`),
 				packageOptions: { entryPoints: ["src/index.ts"], excludeInternal: true, readme: "none" },
 				out: "api",
 				readme: "none",

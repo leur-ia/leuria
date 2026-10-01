@@ -33,9 +33,9 @@ The engine uses the same AIs as the app:
   ```sh
   npx @leuria/cli providers add <name> <address> --key <key>
   ```
-- **An agent** from the [ACP registry](https://agentclientprotocol.com). `npx @leuria/cli agents` lists them. For ChatGPT:
+- **An agent**, such as Codex or Claude Code. `npx @leuria/cli agents` lists the ones Leuria can install. For ChatGPT:
   ```sh
-  npx @leuria/cli setup --agent codex-acp
+  npx @leuria/cli setup --agent codex
   npx @leuria/cli login
   ```
   The sign-in stays separate from any Codex you already use. Claude Code works once it is installed and signed in (run `claude` once), or with `ANTHROPIC_API_KEY`.
@@ -51,7 +51,7 @@ Click **Connect your AI** on your page. The terminal engine can't receive the `l
 ```sh
 npx @leuria/cli sites                                        # connected sites, last used
 npx @leuria/cli sites revoke https://shop.example            # disconnect a site
-npx @leuria/cli sites use https://docs.example codex-acp     # this site uses another AI
+npx @leuria/cli sites use https://docs.example codex         # this site uses another AI
 npx @leuria/cli sites use https://docs.example default       # back to the default AI
 ```
 

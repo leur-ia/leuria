@@ -6,7 +6,7 @@ import { agentName, listAgents, pruneAgentVersions, resolveAgentCommand, resolve
 import { createAdminHandler } from "./admin.js";
 import { convertServiceAis } from "./ais.js";
 import { aiLabel, checkSignIn, rememberAgentState, signIn } from "./auth.js";
-import { detectInstalledClis } from "./detect.js";
+import { agentId, detectInstalledClis } from "./detect.js";
 import { detectLlms, listModels, llmId, removeProvider, saveProvider } from "./llm/providers.js";
 import { runMcpStdio } from "./mcp-stdio.js";
 import { formatChecks, runChecks } from "./doctor.js";
@@ -21,21 +21,21 @@ const HELP = `leuria ${VERSION}: let websites you approve use the AI on this com
 
 Usage:
   leuria [start]               Run the engine (sets itself up on first run)
-  leuria setup [--update]      Install your agent from the ACP registry and check your sign-in
-  leuria login [--method <id>] Sign in to your agent (ACP authenticate)
+  leuria setup [--update]      Install your agent and check your sign-in
+  leuria login [--method <id>] Sign in to your agent
   leuria doctor                Check that everything is ready
   leuria test                  Run a real round trip with your agent
   leuria sites                 List connected sites
   leuria sites revoke <origin> Disconnect a site
   leuria sites use <origin> <agent|default>  Use another AI for one site
-  leuria agents                List AIs: models in LM Studio, Ollama and your APIs, and ACP registry agents
+  leuria agents                List AIs: models in LM Studio, Ollama and your APIs, and the agents Leuria can install
   leuria providers             List LLM providers (LM Studio, Ollama, your APIs)
   leuria providers add <name> <url> [--key <api key>]   Add an OpenAI-compatible API
   leuria providers remove <id>
 
 Options:
   -p, --port <n>       Port (default from ~/.leuria/config.json, else 19570; env LEURIA_PORT)
-  -a, --agent <id>     AI to use and remember: an ACP registry id (codex-acp, claude-acp…)
+  -a, --agent <id>     AI to use and remember: an agent (codex, claude, or an id from \`leuria agents\`)
                        or a model, llm:<provider>/<model> (e.g. llm:ollama/qwen3:8b)
   -v, --verbose        Log every request and session event
   -h, --help           Show this help
@@ -64,6 +64,7 @@ async function main(): Promise<void> {
 	if (values.version) return out(`${VERSION}\n`);
 
 	const config = loadConfig();
+	if (values.agent) values.agent = agentId(values.agent);
 	if (values.agent && values.agent !== config.agent) {
 		config.agent = values.agent;
 		saveConfig(config);
@@ -208,7 +209,7 @@ function sites(args: string[]): void {
 	convertServiceAis(grants);
 	const [sub, origin] = args;
 	if (sub === "use") {
-		const agent = args[2];
+		const agent = args[2] && agentId(args[2]);
 		if (!origin || !agent) throw new Error("Usage: leuria sites use <origin> <agent|default>");
 		const ok = grants.setAgent(origin, agent === "default" ? undefined : agent);
 		out(ok ? `${origin} now uses ${agent === "default" ? "the default AI" : agent}\n` : `${origin} is not connected\n`);

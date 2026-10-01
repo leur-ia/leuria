@@ -21,7 +21,7 @@ pnpm build      # dist/ for both packages
 | `packages/client/test/providers.test.ts` | Server provider (mocked `fetch`), browser provider (fake `LanguageModel`), bridge provider against a real engine | fake agent |
 | `packages/client/test/bridge-transport.test.ts` | Low-level engine client | fake agent |
 
-**The fake agent** speaks ACP on stdio. It calls the first page tool, and reacts to magic words in the prompt:
+**The fake agent** speaks the agent protocol on stdio. It calls the first page tool, and reacts to magic words in the prompt:
 
 | Word | Reaction |
 | --- | --- |

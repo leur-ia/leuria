@@ -12,16 +12,16 @@
 
 ## Overview
 
-The engine runs on the visitor's machine and listens on the loopback interface. Pages reach it over HTTP, server-sent events (SSE) and a WebSocket. Towards agents, the engine speaks [ACP](https://agentclientprotocol.com) v1, the stable version, and MCP. A page never talks to the agent directly.
+The engine runs on the visitor's machine and listens on the loopback interface. Pages reach it over HTTP, server-sent events (SSE) and a WebSocket. Towards the AI, the engine either runs an agent (Claude Code, Codex…) as a local process and talks to it over stdio, or calls a model's chat API and runs the tool loop itself. Either way, the AI reaches the page tools over MCP. A page never talks to the AI directly.
 
 ```mermaid
 flowchart LR
   page["Web page<br/>(any origin)"]
   engine["Leuria engine<br/>127.0.0.1:19570"]
-  agent["Visitor's AI<br/>(ACP agent or model)"]
+  agent["Visitor's AI<br/>(an agent or a model)"]
   page -- "HTTP + SSE<br/>pairing, sessions, embeddings" --> engine
   engine -- "WebSocket<br/>tool calls" --> page
-  engine -- "ACP over stdio,<br/>or the engine's own tool loop" --> agent
+  engine -- "an agent over stdio,<br/>or the engine's own tool loop" --> agent
   agent -- "MCP over HTTP<br/>page tools" --> engine
 ```
 

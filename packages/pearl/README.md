@@ -22,4 +22,4 @@ import { PearlTheme, InkButton } from "@leuria/pearl";
 </PearlTheme>
 ```
 
-Rules worth remembering from the design system: one ink action per view; the Pearl atmosphere only for first impressions (onboarding, empty states), never behind dense UI; status colour always with words; no jargon ("bridge", "ACP", "provider") in anything a visitor reads.
+Rules worth remembering from the design system: one ink action per view; the Pearl atmosphere only for first impressions (onboarding, empty states), never behind dense UI; status colour always with words; no jargon (internal names, protocols, "provider") in anything a visitor reads.

@@ -11,10 +11,10 @@ Leuria has two sides and one contract: an **engine** on the visitor's machine, a
 │  providers:              │  (tool calls)│  routes.ts   /session/*             │
 │   bridge ──────────────┐ │              │  session-manager.ts                 │
 │   promptAPI (Prompt API)│ │              │  webmcp-server.ts  page tools ⇄ MCP │
-│   server (site's API)   │ │              │  acp/  agent process over stdio     │
+│   server (site's API)   │ │              │  agent process over stdio           │
 └─────────────────────────┴─┘              │  policy.ts  what the agent may do   │
                                            └──────────────┬──────────────────────┘
-                                                          │ ACP (JSON-RPC, stdio)
+                                                          │ JSON-RPC over stdio
                                                           ▼
                                             Claude Code adapter (pinned, sandboxed)
 ```
@@ -34,16 +34,16 @@ A Tauri 2 shell (Rust) around the same engine, compiled with Bun as a sidecar an
 | `routes.ts` | The `/session/*` API; sessions are only visible to their origin |
 | `session-manager.ts` | Session lifecycle, a sandbox folder per session, SSE fan-out, limits |
 | `webmcp-server.ts` | Page tools: WebSocket from the page, MCP over HTTP for the agent |
-| `acp/acp-client.ts` | Starts the agent and runs the ACP handshake (`initialize`, `authenticate`, `session/new`), then prompts, cancels, streams updates and answers permission requests |
-| `acp/registry.ts` | The [ACP registry](https://github.com/agentclientprotocol/registry) (see its FORMAT.md): agents, their distribution (npx, uvx, binary archive) and renamed ids |
+| Agent client | Starts the agent and runs the protocol handshake (`initialize`, `authenticate`, `session/new`), then prompts, cancels, streams updates and answers permission requests |
+| Agent registry | The public list of agents: their distribution (npx, uvx, binary archive) and renamed ids |
 | `detect.ts` | Agent CLIs already on the machine, to suggest one |
 | `agents.ts` | Installs any registry agent under `~/.leuria/agents/<id>@<version>` (npm or Bun for npx, sha256-checked archives for binaries) and launches it |
-| `auth.ts` | Sign-in through ACP v1: agent methods via `authenticate`; terminal methods (only in a TTY, with `auth.terminal`) by re-running the agent with the method's args; signed in means `session/new` succeeds |
+| `auth.ts` | Sign-in through the agent protocol: agent methods via `authenticate`; terminal methods (only in a TTY, with `auth.terminal`) by re-running the agent with the method's args; signed in means `session/new` succeeds |
 | `profiles.ts`, `codex.ts` | Extra hardening for agents whose defaults are unsafe. Codex gets its own `CODEX_HOME`, an all-features-off config, a sandbox `HOME`, and page tools through `CODEX_CONFIG` |
 | `admin.ts` | Admin API for the desktop app: status, agents, sign-in, sites, site approvals, check |
 | `llm/providers.ts` | LLM providers: LM Studio and Ollama at their default addresses, the visitor's OpenAI-compatible APIs (`~/.leuria/providers.json`), model discovery (LM Studio's native API for loaded models, Ollama's for cloud models), AI ids `llm:<provider>/<model>` |
-| `llm/llm-session.ts` | The engine's own agent loop for LLMs: streams `/chat/completions` with the page tools, runs tool calls through the relay, repeats until the model answers. Same surface as the ACP session |
-| `mcp-stdio.ts` | `leuria mcp-stdio`: page tools over stdio, for agents without HTTP MCP (stdio is the transport ACP requires) |
+| `llm/llm-session.ts` | The engine's own agent loop for LLMs: streams `/chat/completions` with the page tools, runs tool calls through the relay, repeats until the model answers. Same surface as an agent session |
+| `mcp-stdio.ts` | `leuria mcp-stdio`: page tools over stdio, for agents without HTTP MCP (stdio is the transport every agent supports) |
 | `policy.ts` | Session options that switch off the agent's own tools; permission handler that refuses anything but `mcp__webmcp__*` |
 | `doctor.ts`, `self-test.ts` | Setup checks, and the real round trip behind `leuria test` |
 

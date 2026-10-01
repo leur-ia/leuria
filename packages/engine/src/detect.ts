@@ -18,6 +18,14 @@ const CLI_TO_REGISTRY_ID: Record<string, string> = {
 	qwen: "qwen-code",
 };
 
+/**
+ * An AI id as typed: an agent's short name (`codex`, `claude`) stands for
+ * its registry id; anything else (registry ids, `llm:` models) is kept.
+ */
+export function agentId(input: string): string {
+	return Object.hasOwn(CLI_TO_REGISTRY_ID, input) ? CLI_TO_REGISTRY_ID[input]! : input;
+}
+
 function onPath(command: string): boolean {
 	try {
 		execFileSync(process.platform === "win32" ? "where" : "which", [command], { stdio: "pipe" });
