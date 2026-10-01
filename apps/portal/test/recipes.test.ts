@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import * as client from "@leuria/client";
 import {
 	BaseProvider,
-	createLeuria,
+	createAI,
 	type EmbedRequest,
 	type EmbedResult,
 	type JsonSchema,
@@ -84,7 +84,7 @@ afterEach(() => ai?.destroy());
 describe("recipes", () => {
 	if (found.length === 0) it.skip("no runnable recipes yet", () => undefined);
 	it.each(found)("$name runs", async ({ code }) => {
-		ai = createLeuria({ providers: [new FakeAI()], autoDetect: false, closeOnUnload: false });
+		ai = createAI({ providers: [new FakeAI()], autoDetect: false, closeOnUnload: false });
 		const printed: unknown[] = [];
 		globalThis.confirm ??= () => true;
 		await run(code, { ai, modules: { "@leuria/client": client, "@leuria/store": store }, print: (v) => printed.push(v) });
