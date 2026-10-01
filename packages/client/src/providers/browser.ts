@@ -33,7 +33,9 @@ interface LanguageModelStatic {
 }
 
 function languageModel(): LanguageModelStatic | undefined {
-	return (globalThis as { LanguageModel?: LanguageModelStatic }).LanguageModel;
+	const api = (globalThis as { LanguageModel?: LanguageModelStatic }).LanguageModel;
+	// @leuria/prompt-api's LanguageModel is the visitor's AI again, already served by leuria().
+	return api && !(api as unknown as Record<symbol, unknown>)[Symbol.for("leuria.prompt-api")] ? api : undefined;
 }
 
 export class BrowserAIProvider extends BaseProvider {

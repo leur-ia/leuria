@@ -1,0 +1,35 @@
+{
+  "name": "@leuria/prompt-api",
+  "version": "0.1.0",
+  "description": "The Prompt API (LanguageModel) in every browser, served by the visitor's own AI through Leuria when the browser has no built-in model.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leur-ia/leuria.git",
+    "directory": "packages/prompt-api"
+  },
+  "homepage": "https://leuria.dev",
+  "keywords": ["prompt-api", "LanguageModel", "polyfill", "built-in-ai", "web-ai"],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "check": "tsc --noEmit && tsc -p test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@leuria/client": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

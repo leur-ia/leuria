@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Prompt API on Leuria: manual check</title>
+<!-- Serve the packages/ folder (e.g. `python3 -m http.server 8765` in packages/), open /prompt-api/test/browser/ -->
+<script type="importmap">
+{ "imports": { "@leuria/client": "/client/dist/index.js" } }
+</script>
+<style>body{font:15px system-ui;margin:2rem;max-width:50rem}pre{white-space:pre-wrap;background:#f4f4f4;padding:1rem}</style>
+<h1>Prompt API on Leuria</h1>
+<p><button id="go">Create a session and run the checks</button></p>
+<pre id="log"></pre>
+<script type="module">
+import { installPromptAPI } from "/prompt-api/dist/index.js";
+const log = (...a) => { document.querySelector("#log").textContent += a.join(" ") + "\n"; console.log("[check]", ...a); };
+log("installed:", await installPromptAPI({ app: "Prompt API check", when: "always" }));
+log("availability:", await LanguageModel.availability());
+document.querySelector("#go").onclick = async () => {
+  try {
+    const session = await LanguageModel.create({
+      initialPrompts: [{ role: "system", content: "You are terse." }],
+      monitor: (m) => m.addEventListener("downloadprogress", (e) => log("progress", e.loaded)),
+      tools: [{
+        name: "getWeather", description: "Current weather for a city.",
+        inputSchema: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+        async execute({ city }) { log("tool called:", city); return `18°C and sunny in ${city}`; },
+      }],
+    });
+    log("created; availability now:", await LanguageModel.availability());
+    log("prompt:", await session.prompt("Say hello in French, one word."));
+    let streamed = "";
+    for await (const chunk of session.promptStreaming("Count from 1 to 5, comma separated.")) streamed += chunk;
+    log("streamed:", streamed);
+    log("json:", await session.prompt("Rate the movie Alien from 1 to 5.", {
+      responseConstraint: { type: "object", properties: { rating: { type: "integer", minimum: 1, maximum: 5 } }, required: ["rating"] },
+    }));
+    log("tool:", await session.prompt("What's the weather in Lyon? Use the tool."));
+    log("memory:", await session.prompt("What was the first thing I asked you?"));
+    log("usage:", session.contextUsage, "/", session.contextWindow);
+    session.destroy();
+    log("DONE");
+  } catch (e) { log("ERROR", e.name, e.message); }
+};
+</script>
