@@ -13,10 +13,10 @@ No bundler, no build. One script from a CDN brings the SDK and the Connect UI.
 <p id="answer"></p>
 
 <script type="module">
-  import { bridge, browserAI, createLeuria, setDefaultClient } from "https://cdn.jsdelivr.net/npm/@leuria/connect/dist/standalone.js"
+  import { leuria, promptAPI, createAI, setDefaultClient } from "https://cdn.jsdelivr.net/npm/@leuria/connect/dist/standalone.js"
 
   // The visitor's own AI first, then the browser's built-in model.
-  const ai = createLeuria({ providers: [bridge({ app: "My site" }), browserAI()] })
+  const ai = createAI({ providers: [leuria({ app: "My site" }), promptAPI()] })
   setDefaultClient(ai)
 
   document.querySelector("#ask").onclick = async () => {
@@ -38,10 +38,10 @@ npm install @leuria/client @leuria/connect
 ```
 
 ```ts
-import { bridge, browserAI, createLeuria, defineTool } from "@leuria/client"
+import { leuria, promptAPI, createAI, defineTool } from "@leuria/client"
 import { setDefaultClient } from "@leuria/connect" // defines <leuria-connect-button>
 
-const ai = createLeuria({ providers: [bridge({ app: "Mug shop" }), browserAI()] })
+const ai = createAI({ providers: [leuria({ app: "Mug shop" }), promptAPI()] })
 setDefaultClient(ai)
 
 const MUGS = [{ name: "Celadon", price: 24 }, { name: "Tenmoku", price: 31 }]
@@ -66,12 +66,12 @@ npm install @leuria/client @leuria/react @leuria/react-connect
 ```
 
 ```tsx
-import { bridge, browserAI, createLeuria } from "@leuria/client"
+import { leuria, promptAPI, createAI } from "@leuria/client"
 import { LeuriaProvider, useConversation } from "@leuria/react"
 import { ConnectButton } from "@leuria/react-connect"
 
 // Once, outside render.
-const ai = createLeuria({ providers: [bridge({ app: "My app" }), browserAI()] })
+const ai = createAI({ providers: [leuria({ app: "My app" }), promptAPI()] })
 
 function Assistant() {
   const { messages, status, send } = useConversation({ system: "Answer in one short paragraph." })

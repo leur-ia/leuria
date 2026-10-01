@@ -50,16 +50,17 @@ export const leuria = new Promise<{ ai: Leuria; docs: Docs }>((resolve) => {
 });
 
 async function start(settings: ClientConfig): Promise<void> {
-	const [{ bridge, browserAI, createLeuria, server }, { setDefaultAppearance, setDefaultClient }, { createDocs, setupDocs }] = await Promise.all([
+	const [{ bridge, promptAPI, createAI, server }, { setDefaultAppearance, setDefaultClient }, { createDocs, setupDocs }] = await Promise.all([
 		import("@leuria/client"),
 		import("@leuria/connect"),
 		import("@leuria/docs"),
 	]);
-	const providers: Provider[] = [bridge({ app: settings.app, needs: settings.needs }), browserAI()];
+	// `bridge` is `leuria()` from @leuria/client: `leuria` here is this module's own export.
+	const providers: Provider[] = [bridge({ app: settings.app, needs: settings.needs }), promptAPI()];
 	if (loadEmbedder) providers.push(await loadEmbedder());
 	if (settings.server) providers.push(server({ url: settings.server.url }));
 
-	const ai = createLeuria({ providers, fallback: settings.fallback });
+	const ai = createAI({ providers, fallback: settings.fallback });
 	setDefaultClient(ai);
 	followTheme(setDefaultAppearance);
 

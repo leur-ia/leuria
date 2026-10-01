@@ -305,6 +305,10 @@ function toAttachments(message: Message): BridgeAttachment[] {
 	return attachments;
 }
 
-export function bridge(options: BridgeProviderOptions = {}): BridgeProvider {
+/** The visitor's own AI, through the Leuria app on their computer. Its provider id is `"bridge"`. */
+export function leuria(options: BridgeProviderOptions = {}): BridgeProvider {
 	return new BridgeProvider(options);
 }
+
+/** @deprecated The same as {@link leuria}, its first name. */
+export const bridge = leuria;

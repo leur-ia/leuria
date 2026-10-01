@@ -3,11 +3,11 @@
 How to use Leuria from React: the visitor's AI, conversations and the connect flow, as React state.
 
 ```tsx
-import { bridge, browserAI, createLeuria } from "@leuria/client"
+import { leuria, promptAPI, createAI } from "@leuria/client"
 import { LeuriaProvider, useConnect, useConversation } from "@leuria/react"
 
 // Create the client once, outside render.
-const ai = createLeuria({ providers: [bridge({ app: "My shop" }), browserAI()] })
+const ai = createAI({ providers: [leuria({ app: "My shop" }), promptAPI()] })
 
 export function App() {
   return (

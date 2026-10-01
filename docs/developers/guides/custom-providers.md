@@ -19,7 +19,7 @@ class MyProvider extends BaseProvider {
   }
 }
 
-const ai = createLeuria({ providers: [bridge(), new MyProvider(), browserAI()] })
+const ai = createAI({ providers: [leuria(), new MyProvider(), promptAPI()] })
 ```
 
 ## The provider

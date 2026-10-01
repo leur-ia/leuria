@@ -10,7 +10,7 @@ Leuria has two sides and one contract: an **engine** on the visitor's machine, a
 │  Conversation (turns)    │ ◀─ WebSocket │  pairing.ts  approval page, grants  │
 │  providers:              │  (tool calls)│  routes.ts   /session/*             │
 │   bridge ──────────────┐ │              │  session-manager.ts                 │
-│   browserAI (Prompt API)│ │              │  webmcp-server.ts  page tools ⇄ MCP │
+│   promptAPI (Prompt API)│ │              │  webmcp-server.ts  page tools ⇄ MCP │
 │   server (site's API)   │ │              │  acp/  agent process over stdio     │
 └─────────────────────────┴─┘              │  policy.ts  what the agent may do   │
                                            └──────────────┬──────────────────────┘
@@ -53,7 +53,7 @@ A Tauri 2 shell (Rust) around the same engine, compiled with Bun as a sidecar an
 
 | File | Role |
 | --- | --- |
-| `leuria.ts` | `createLeuria`: provider cascade (`select`), state snapshot, `connect`, global middleware and events, close on unload |
+| `leuria.ts` | `createAI`: provider cascade (`select`), state snapshot, `connect`, global middleware and events, close on unload |
 | `conversation.ts` | Turns: queue, turn context, timeouts, tool runner (middleware, budget, `endTurn`, tools the visitor answers), structured output routing, provider session switching |
 | `run.ts` | `ChatRun`: an async-iterable turn with `text()`, `object()`, `result()` |
 | `structured.ts` | `submit_result` tool route and JSON extraction |

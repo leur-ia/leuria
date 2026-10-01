@@ -3,12 +3,12 @@
 A site writes each AI feature once. For each request, the SDK picks the best AI this visitor has.
 
 ```ts
-import { createLeuria, bridge, browserAI, server, defineTool } from "@leuria/client"
+import { createAI, leuria, promptAPI, server, defineTool } from "@leuria/client"
 
-const ai = createLeuria({
+const ai = createAI({
   providers: [
-    bridge({ app: "Mug shop" }),                      // the visitor's own AI, through the Leuria engine
-    browserAI(),                                      // the browser's built-in model (Chrome's Prompt API)
+    leuria({ app: "Mug shop" }),                      // the visitor's own AI, through the Leuria engine
+    promptAPI(),                                      // the browser's built-in model (Chrome's Prompt API)
     server({ url: "/api/ai/chat/completions" }),      // your server, as the last resort
   ],
 })

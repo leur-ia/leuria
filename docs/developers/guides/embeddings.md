@@ -56,10 +56,10 @@ const close = await notes.similar("celadon")                                 // 
 For visitors whose own AI can't embed. It runs [Transformers.js](https://huggingface.co/docs/transformers.js) in a Web Worker, so the page stays responsive.
 
 ```ts
-import { bridge, browserAI, createLeuria } from "@leuria/client"
+import { leuria, promptAPI, createAI } from "@leuria/client"
 import { pageEmbedder } from "@leuria/web-embed"
 
-const ai = createLeuria({ providers: [bridge(), browserAI(), pageEmbedder()] })
+const ai = createAI({ providers: [leuria(), promptAPI(), pageEmbedder()] })
 // Later, from a click (the visitor agrees to the download):
 await ai.connect("page-embed")
 ```

@@ -20,10 +20,10 @@ No bundler, no build. One script brings the SDK and the Connect button:
 <p id="answer"></p>
 
 <script type="module">
-  import { bridge, browserAI, createLeuria, setDefaultClient } from "https://cdn.jsdelivr.net/npm/@leuria/connect/dist/standalone.js"
+  import { leuria, promptAPI, createAI, setDefaultClient } from "https://cdn.jsdelivr.net/npm/@leuria/connect/dist/standalone.js"
 
   // The visitor's own AI first, then the browser's built-in model.
-  const ai = createLeuria({ providers: [bridge({ app: "My site" }), browserAI()] })
+  const ai = createAI({ providers: [leuria({ app: "My site" }), promptAPI()] })
   setDefaultClient(ai)
 
   document.querySelector("#ask").onclick = async () => {
@@ -45,11 +45,11 @@ npm install @leuria/client @leuria/connect
 ```
 
 ```ts
-import { bridge, browserAI, createLeuria, defineTool, server } from "@leuria/client"
+import { leuria, promptAPI, createAI, defineTool, server } from "@leuria/client"
 import { setDefaultClient } from "@leuria/connect" // defines <leuria-connect-button>
 
 // The visitor's own AI first, then the browser's model, then your server.
-const ai = createLeuria({ providers: [bridge({ app: "My shop" }), browserAI(), server({ url: "/api/ai" })] })
+const ai = createAI({ providers: [leuria({ app: "My shop" }), promptAPI(), server({ url: "/api/ai" })] })
 setDefaultClient(ai)
 
 // Runs in the page. The AI only sees what the tool returns.

@@ -167,6 +167,14 @@ class BrowserSession implements ProviderSession {
 	}
 }
 
-export function browserAI(options: BrowserAIOptions = {}): BrowserAIProvider {
+/**
+ * The browser's built-in model, through the Prompt API (`LanguageModel`, in
+ * Chrome with Gemini Nano). Where the browser has none, it is skipped. Its
+ * provider id is `"browser"`.
+ */
+export function promptAPI(options: BrowserAIOptions = {}): BrowserAIProvider {
 	return new BrowserAIProvider(options);
 }
+
+/** @deprecated The same as {@link promptAPI}, its first name. */
+export const browserAI = promptAPI;

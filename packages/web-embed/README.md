@@ -3,10 +3,10 @@
 A small embedding model that runs in the page, as a Leuria provider: search by meaning for visitors whose own AI can't embed. It uses [Transformers.js](https://huggingface.co/docs/transformers.js) in a Web Worker, so the page stays responsive.
 
 ```ts
-import { bridge, browserAI, createLeuria } from "@leuria/client"
+import { leuria, promptAPI, createAI } from "@leuria/client"
 import { pageEmbedder } from "@leuria/web-embed"
 
-const ai = createLeuria({ providers: [bridge(), browserAI(), pageEmbedder()] })
+const ai = createAI({ providers: [leuria(), promptAPI(), pageEmbedder()] })
 // Later, from a click (the visitor agrees to the download):
 await ai.connect("page-embed")
 ```

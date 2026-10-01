@@ -33,5 +33,5 @@ print(answer)
 ## How it works
 
 - A middleware gets the call (`name`, `args`, `callId`, the turn's `context`) and `next()`, which runs the tool. It returns `{ ok: true, result }` or `{ ok: false, error }`.
-- Put it on one request or conversation (`middleware`), or on every call of the page (`createLeuria({ middleware })`); the page-wide layers run first.
+- Put it on one request or conversation (`middleware`), or on every call of the page (`createAI({ middleware })`); the page-wide layers run first.
 - Use it for audit logs, to block a call in some state, or to mark text you don't control as data, not instructions. See [Page tools](../guides/tools.md).

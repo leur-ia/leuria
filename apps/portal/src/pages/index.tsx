@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
 
 import styles from "./index.module.css";
 
-const SNIPPET = `import { createLeuria, bridge, browserAI, defineTool } from "@leuria/client"
+const SNIPPET = `import { createAI, leuria, promptAPI, defineTool } from "@leuria/client"
 
 // The visitor's own AI first, then the browser's model.
-const ai = createLeuria({ providers: [bridge({ app: "My shop" }), browserAI()] })
+const ai = createAI({ providers: [leuria({ app: "My shop" }), promptAPI()] })
 
 const searchProducts = defineTool({
   name: "search_products",

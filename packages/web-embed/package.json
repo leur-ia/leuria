@@ -1,6 +1,6 @@
 {
   "name": "@leuria/web-embed",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A small embedding model that runs in the page (Transformers.js), as a Leuria provider: search by meaning for visitors without their own model.",
   "license": "Apache-2.0",
   "type": "module",

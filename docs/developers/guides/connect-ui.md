@@ -8,8 +8,8 @@ How to let visitors bring their own AI to your page: Leuria's ready-made element
 <leuria-badge></leuria-badge>
 
 <script type="module">
-  import { bridge, browserAI, createLeuria, setDefaultClient } from "@leuria/connect/standalone"
-  setDefaultClient(createLeuria({ providers: [bridge({ app: "My shop" }), browserAI()] }))
+  import { leuria, promptAPI, createAI, setDefaultClient } from "@leuria/connect/standalone"
+  setDefaultClient(createAI({ providers: [leuria({ app: "My shop" }), promptAPI()] }))
 </script>
 ```
 

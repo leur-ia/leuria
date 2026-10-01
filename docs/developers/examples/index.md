@@ -13,4 +13,4 @@ Small recipes, each one complete. On the portal you can edit and run them in the
 | [Middleware](middleware.md) | Watch and redact every tool call | An AI that uses tools |
 | [Who answers](routing.md) | The cascade, routing options, and what to do when no AI can answer | Nothing |
 
-In the runnable blocks, `ai` is the page's Leuria client, `print(value)` shows a value, and `signal` stops the run when you press Stop. In your own code, create the client with `createLeuria` (see the [Quickstart](../quickstart.md)).
+In the runnable blocks, `ai` is the page's Leuria client, `print(value)` shows a value, and `signal` stops the run when you press Stop. In your own code, create the client with `createAI` (see the [Quickstart](../quickstart.md)).

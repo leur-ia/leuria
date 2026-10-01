@@ -94,10 +94,10 @@ writeFileSync("public/corpus.json", JSON.stringify(corpus))
 In the page:
 
 ```ts
-import { bridge, browserAI, createLeuria } from "@leuria/client"
+import { leuria, promptAPI, createAI } from "@leuria/client"
 import { createDocs, setupDocs } from "@leuria/docs"
 
-const ai = createLeuria({ providers: [bridge({ app: "My docs" }), browserAI()] })
+const ai = createAI({ providers: [leuria({ app: "My docs" }), promptAPI()] })
 const docs = createDocs(ai, {
   corpus: () => fetch("/corpus.json").then((r) => r.json()), // fetched on first use
   navigate: (url) => router.push(url), // optional: your router, instead of a page load

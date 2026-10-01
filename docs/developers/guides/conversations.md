@@ -97,4 +97,4 @@ This is the shape of assistant-ui's external store (`onNew` → `send`, `onCance
 
 ## Unload
 
-Provider sessions (running agents) close on `pagehide`. Turn this off with `createLeuria({ closeOnUnload: false })`; `ai.closeAll()` closes them by hand. Histories are kept.
+Provider sessions (running agents) close on `pagehide`. Turn this off with `createAI({ closeOnUnload: false })`; `ai.closeAll()` closes them by hand. Histories are kept.

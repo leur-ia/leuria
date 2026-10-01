@@ -3,12 +3,12 @@
 How the SDK picks the AI that answers each request, and how a page follows that choice.
 
 ```ts
-import { createLeuria, bridge, browserAI, server } from "@leuria/client"
+import { createAI, leuria, promptAPI, server } from "@leuria/client"
 
-const ai = createLeuria({
+const ai = createAI({
   providers: [
-    bridge({ app: "Mug shop" }),                      // the visitor's own AI, through the Leuria engine
-    browserAI(),                                      // the browser's built-in model (Chrome's Prompt API)
+    leuria({ app: "Mug shop" }),                      // the visitor's own AI, through the Leuria engine
+    promptAPI(),                                      // the browser's built-in model (Chrome's Prompt API)
     server({ url: "/api/ai/chat/completions" }),      // your server, as the last resort
   ],
 })
@@ -23,13 +23,13 @@ Providers are tried in the order you give them. A request goes to the first one 
 
 ### The visitor's own AI first
 
-Leuria is the preferred way: the visitor's own AI, with no cost to you. When you declare `bridge()`, the providers after it wait while it isn't ready. They answer only once the visitor picks one instead, from the Connect UI's secondary choices ("use this browser's AI", "use this site's AI"). The pick lasts for this page: next time, their own AI is proposed again.
+Leuria is the preferred way: the visitor's own AI, with no cost to you. When you declare `leuria()`, the providers after it wait while it isn't ready. They answer only once the visitor picks one instead, from the Connect UI's secondary choices ("use this browser's AI", "use this site's AI"). The pick lasts for this page: next time, their own AI is proposed again.
 
 - `ai.chooseInstead(id)` records the visitor's pick. The Connect UI calls it for you; call it from your own UI's click otherwise.
 - `ai.getState().alternatives` lists what could answer once picked: ready providers, and ones a click would download.
-- `createLeuria({ fallback: "auto" })` skips the question: the others answer at once, as plain fallbacks.
+- `createAI({ fallback: "auto" })` skips the question: the others answer at once, as plain fallbacks.
 - A provider you name in `provider` (see [Routing](#routing)) is your own choice, and never waits.
-- Providers listed *before* `bridge()` are never held back. A site that doesn't want to propose Leuria simply doesn't declare `bridge()`.
+- Providers listed *before* `leuria()` are never held back. A site that doesn't want to propose Leuria simply doesn't declare `leuria()`.
 
 The page never needs to know which provider answered, but it can: every run starts with a `start` event naming it, and each assistant message keeps it in `metadata.provider`.
 
@@ -37,18 +37,18 @@ The page never needs to know which provider answered, but it can: every run star
 
 | Provider | Id | Locality | Capabilities | Visitor action |
 | --- | --- | --- | --- | --- |
-| `bridge()` | `bridge` | device | chat, tools, agent, images; embed when the visitor has a local embedding model (structured output through the tool route) | `connect`: a `leuria://connect` link opens Leuria, which asks in its own window |
-| `browserAI()` | `browser` | device | chat, structured; tools with `browserAI({ tools: true })` | `download`: fetch the browser's model |
+| `leuria()` | `bridge` | device | chat, tools, agent, images; embed when the visitor has a local embedding model (structured output through the tool route) | `connect`: a `leuria://connect` link opens Leuria, which asks in its own window |
+| `promptAPI()` | `browser` | device | chat, structured; tools with `promptAPI({ tools: true })` | `download`: fetch the browser's model |
 | `server({ url })` | `server` | site | chat, tools (unless `tools: false`); structured natively with `jsonSchema: true`; images with `images: true` | none |
 
-**`bridge(options)`**: the visitor's own AI, through the Leuria engine on their computer. Until the site is connected it sends nothing (Leuria wouldn't answer a site it doesn't know), so it starts as `needs-action` / `connect`, and becomes `unavailable` only when a connect gets no answer.
+**`leuria(options)`**: the visitor's own AI, through the Leuria engine on their computer. Until the site is connected it sends nothing (Leuria wouldn't answer a site it doesn't know), so it starts as `needs-action` / `connect`, and becomes `unavailable` only when a connect gets no answer.
 - `app`: the name shown to the visitor in the approval window.
 - `needs`: what your features need, so Leuria recommends an AI and model that fit, and no bigger (see [Declare what your features need](#declare-what-your-features-need)).
 - `url`: the engine's address (default `http://127.0.0.1:19570`).
 - `storage`: where the site's token is kept (default `localStorage`, else memory).
 - `id`: default `bridge`.
 
-**`browserAI(options)`**: the browser's built-in model (`LanguageModel`, Gemini Nano in Chrome). Free and on the device, but small: good for short answers, extraction and structured output.
+**`promptAPI(options)`**: the browser's built-in model (`LanguageModel`, Gemini Nano in Chrome). Free and on the device, but small: good for short answers, extraction and structured output.
 - `tools`: pass page tools to the model. Default false, because browser support varies: Chrome's model accepts them but may not call them. To let it answer a conversation that has tools, use `withoutTools` (see [Tools](tools.md#an-ai-that-cant-use-tools)).
 - `languages`: e.g. `["en"]`, for the model's expected inputs and outputs.
 - `id` (default `browser`), `label`.
@@ -68,7 +68,7 @@ To add your own provider (an in-page model, another API), see [Custom providers]
 Visitors often run a model far stronger (and costlier) than a site's features need. Tell Leuria what they need, and it guides the visitor to the cheapest of their AIs that is enough:
 
 ```ts
-bridge({ app: "Kiln & Co.", needs: { tools: true, effort: "light" } })
+leuria({ app: "Kiln & Co.", needs: { tools: true, effort: "light" } })
 ```
 
 - `tools`, `images`: the capabilities your features use.
@@ -125,7 +125,7 @@ For a ready-made button, or to follow the connect flow in your own UI, see [Conn
 
 ## Other options
 
-`createLeuria({ … })` also takes:
+`createAI({ … })` also takes:
 - `middleware`: wraps every tool call of every conversation (see [Tools](tools.md#middleware));
 - `closeOnUnload`: end provider sessions when the page goes away. Default true (see [Conversations](conversations.md#unload)).
 

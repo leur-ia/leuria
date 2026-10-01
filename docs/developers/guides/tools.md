@@ -88,7 +88,7 @@ convo.subscribe(() => {
 
 ## Middleware
 
-`createLeuria({ middleware })` and `conversation({ middleware })` wrap every tool call, global layers first. A middleware gets the call (`{ callId, turnId, name, args, context }`) and `next()`, and returns the outcome (`{ ok: true, result }` or `{ ok: false, error }`):
+`createAI({ middleware })` and `conversation({ middleware })` wrap every tool call, global layers first. A middleware gets the call (`{ callId, turnId, name, args, context }`) and `next()`, and returns the outcome (`{ ok: true, result }` or `{ ok: false, error }`):
 
 ```ts
 const redact: ToolMiddleware = async (call, next) => {

@@ -390,6 +390,15 @@ export class Leuria {
 	}
 }
 
-export function createLeuria(options: LeuriaOptions): Leuria {
+/**
+ * One AI client for the page, over the AIs you list, in order: the first that
+ * can answer does.
+ *
+ *   const ai = createAI({ providers: [leuria({ app: "My shop" }), promptAPI(), server({ url: "/api/ai" })] })
+ */
+export function createAI(options: LeuriaOptions): Leuria {
 	return new Leuria(options);
 }
+
+/** @deprecated The same as {@link createAI}, its first name. */
+export const createLeuria = createAI;

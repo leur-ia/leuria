@@ -257,3 +257,14 @@ describe("conversation", () => {
 		expect(convo.getState().messages.map((m) => m.role)).toEqual(["user"]);
 	});
 });
+
+describe("names", () => {
+	it("keeps the first names as aliases of the agnostic ones", async () => {
+		const sdk = await import("../src/index.js");
+		expect(sdk.createLeuria).toBe(sdk.createAI);
+		expect(sdk.bridge).toBe(sdk.leuria);
+		expect(sdk.browserAI).toBe(sdk.promptAPI);
+		const ai = sdk.createAI({ providers: [sdk.leuria(), sdk.promptAPI()] });
+		expect(ai.getState().providers.map((p) => p.id)).toEqual(["bridge", "browser"]);
+	});
+});

@@ -7,7 +7,7 @@ const LeuriaContext = createContext<Leuria | null>(null);
  * Makes a Leuria client available to the hooks below it. Create the
  * client once, outside render:
  *
- *   const ai = createLeuria({ providers: [bridge({ app: "Mug shop" }), browserAI()] })
+ *   const ai = createAI({ providers: [leuria({ app: "Mug shop" }), promptAPI()] })
  *   <LeuriaProvider client={ai}><App /></LeuriaProvider>
  */
 export function LeuriaProvider({ client, children }: { client: Leuria; children?: ReactNode }) {

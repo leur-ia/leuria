@@ -3,10 +3,10 @@
 React hooks for [Leuria](https://github.com/leur-ia/leuria): the visitor's AI, conversations and the connect flow, as React state. Headless: bring your own UI, or use [`@leuria/react-connect`](../react-connect) for Leuria's.
 
 ```tsx
-import { bridge, browserAI, createLeuria } from "@leuria/client"
+import { leuria, promptAPI, createAI } from "@leuria/client"
 import { LeuriaProvider, useConnect, useConversation } from "@leuria/react"
 
-const ai = createLeuria({ providers: [bridge({ app: "My shop" }), browserAI()] })
+const ai = createAI({ providers: [leuria({ app: "My shop" }), promptAPI()] })
 
 <LeuriaProvider client={ai}><App /></LeuriaProvider>
 

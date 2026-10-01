@@ -3,11 +3,11 @@
 How to give the visitor's AI instructions for tasks on your site, as skills. Leuria fetches them, shows them to the visitor, and gives them to the AI in your site's conversations only.
 
 ```ts
-import { bridge, createLeuria } from "@leuria/client"
+import { leuria, createAI } from "@leuria/client"
 
-const ai = createLeuria({
+const ai = createAI({
   providers: [
-    bridge({
+    leuria({
       app: "Kiln & Co.",
       skills: [
         "/",                                                  // your own, from /.well-known/agent-skills
