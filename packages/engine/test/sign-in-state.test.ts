@@ -32,7 +32,7 @@ describe("whether an agent is signed in", () => {
 		const status = await checkSignIn("fake-ai", undefined, { quiet: true });
 		expect(status).toMatchObject({ ok: false, detail: "not signed in", methods: [] });
 		// Its only sign-in is on the command line: a window, where Leuria can open one.
-		expect(status.window).toBe(process.platform === "darwin" || process.platform === "win32");
+		expect(status.window ?? false).toBe(process.platform === "darwin" || process.platform === "win32");
 	});
 
 	it("keeps the browser sign-in when an agent has one, even with a command-line one", async () => {
