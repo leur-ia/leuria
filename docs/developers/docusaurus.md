@@ -40,7 +40,8 @@ At build time the plugin reads the Markdown of every docs page (drafts and unlis
 | `connectButton` | `false` | Also put "Connect your AI" in the navbar |
 | `webmcp` | `true` | Offer the docs tools to the browser's own agents |
 | `pageEmbeddings` | `false` | A small embedding model in the page for search by meaning, for readers whose AI can't embed. About 40 MB, downloaded only when the reader agrees. Its runtime comes from jsDelivr and the model from Hugging Face. Needs `npm install @leuria/web-embed` |
-| `server` | none | `{ url }`: your own Chat Completions endpoint, as the last resort for readers with no AI |
+| `server` | none | Your own Chat Completions endpoint, as the last resort for readers with no AI: `{ url, model?, jsonSchema?, tools?, images?, label? }`. Set `model` when the endpoint doesn't pick one (LiteLLM, OpenRouter). Everything here reaches the page: add the API key on your server, never here |
+| `skills` | none | Skills that guide the reader's AI on your site: `"/"` for your own `static/.well-known/agent-skills/`, or a GitHub repo pinned to a commit (`owner/repo/path#commit`). Readers see them when they connect. Only readers with the Leuria app get them. See [Skills](guides/skills.md) |
 | `needs` | `{ tools: true, effort: "light" }` | What the Ask panel needs, so Leuria recommends a model that fits and no bigger. Raise `effort` for docs where answers need more reasoning |
 | `fallback` | `"ask"` | Readers without Leuria: `"ask"` proposes Leuria first, and the browser's AI or your server answer only once the reader picks one, for the page. `"auto"` uses them at once |
 | `docsPluginIds` | every one | Only these docs plugin instances |

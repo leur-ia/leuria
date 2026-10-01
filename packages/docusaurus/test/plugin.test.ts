@@ -73,8 +73,21 @@ describe("@leuria/docusaurus", () => {
 		expect(readFileSync(join(on.context.generatedFilesDir, "leuria/embedder.js"), "utf8")).toContain('import("@leuria/web-embed/cdn")');
 	});
 
+	it("hands the server's model and the skills on to the page", () => {
+		const { context } = site();
+		leuriaDocusaurus(context, {
+			server: { url: "/api/ai/chat/completions", model: "gpt-4o-mini", jsonSchema: true },
+			skills: ["/", "acme/docs-skills/ask#0123abc"],
+		});
+		const config = JSON.parse(readFileSync(join(context.generatedFilesDir, "leuria/config.json"), "utf8"));
+		expect(config.server).toEqual({ url: "/api/ai/chat/completions", model: "gpt-4o-mini", jsonSchema: true });
+		expect(config.skills).toEqual(["/", "acme/docs-skills/ask#0123abc"]);
+	});
+
 	it("validates its options and keeps the instance id", () => {
 		expect(validateOptions({ options: {} })).toEqual({ id: "default" });
 		expect(() => validateOptions({ options: { askButton: "top" as never } })).toThrow(/askButton/);
+		expect(() => validateOptions({ options: { skills: "/" as never } })).toThrow(/skills/);
+		expect(() => validateOptions({ options: { server: { url: "/x", model: 4 as never } } })).toThrow(/model/);
 	});
 });

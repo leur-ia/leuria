@@ -56,9 +56,9 @@ async function start(settings: ClientConfig): Promise<void> {
 		import("@leuria/docs"),
 	]);
 	// `bridge` is `leuria()` from @leuria/client: `leuria` here is this module's own export.
-	const providers: Provider[] = [bridge({ app: settings.app, needs: settings.needs }), promptAPI()];
+	const providers: Provider[] = [bridge({ app: settings.app, needs: settings.needs, skills: settings.skills }), promptAPI()];
 	if (loadEmbedder) providers.push(await loadEmbedder());
-	if (settings.server) providers.push(server({ url: settings.server.url }));
+	if (settings.server) providers.push(server({ ...settings.server }));
 
 	const ai = createAI({ providers, fallback: settings.fallback });
 	setDefaultClient(ai);

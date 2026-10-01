@@ -18,6 +18,25 @@ import { fileURLToPath } from "node:url";
 import type { LoadContext, Plugin } from "@docusaurus/types";
 import { buildCorpus, type DocsPage } from "@leuria/docs/build";
 
+/**
+ * Your own Chat Completions endpoint, as the last resort. Everything here
+ * reaches the page: put no API key in it, add the key on the server.
+ */
+export interface ServerOptions {
+	/** Chat Completions URL, e.g. `/api/ai/chat/completions`. */
+	url: string;
+	/** Sent as `model`. Needed by endpoints that don't pick one (LiteLLM, OpenRouter…). */
+	model?: string;
+	/** The endpoint supports `response_format: { type: "json_schema" }`. Default false. */
+	jsonSchema?: boolean;
+	/** The endpoint supports tool calls. Default true. */
+	tools?: boolean;
+	/** The endpoint accepts images. Default false. */
+	images?: boolean;
+	/** The name readers see when they pick it, e.g. "This site's AI". */
+	label?: string;
+}
+
 export interface Options {
 	/** The name Leuria shows when the reader connects the site. Default: the site's title. */
 	app?: string;
@@ -57,8 +76,17 @@ export interface Options {
 	 * your pages, then answers.
 	 */
 	needs?: { tools?: boolean; images?: boolean; effort?: "light" | "standard" | "deep"; context?: number };
+	/**
+	 * Skills that guide the reader's AI on your site, in the `npx skills`
+	 * syntax: `"/"` for your site's own `static/.well-known/agent-skills/`,
+	 * `owner/repo`, `owner/repo@skill`, or `owner/repo/path#commit` pinned to
+	 * a commit. Leuria fetches them, shows them to the reader when they
+	 * connect, and gives them to their AI on your site only. Readers without
+	 * the Leuria app don't get them.
+	 */
+	skills?: string[];
 	/** Your server as the last resort, for readers with no AI of their own. */
-	server?: { url: string };
+	server?: ServerOptions;
 	/**
 	 * Readers without Leuria: `ask` (default) proposes Leuria first, and this
 	 * browser's AI or your server answer only once the reader picks one (for
@@ -77,7 +105,8 @@ export interface ClientConfig {
 	system?: string;
 	askButton: "navbar" | "floating" | "none";
 	webmcp: boolean;
-	server?: { url: string };
+	server?: ServerOptions;
+	skills?: string[];
 	fallback: "ask" | "auto";
 	needs: { tools?: boolean; images?: boolean; effort?: "light" | "standard" | "deep"; context?: number };
 }
@@ -165,6 +194,7 @@ export default function leuriaDocusaurus(context: LoadContext, options: Options 
 		askButton,
 		webmcp: options.webmcp ?? true,
 		server: options.server,
+		skills: options.skills,
 		fallback: options.fallback ?? "ask",
 		needs: options.needs ?? { tools: true, effort: "light" },
 	};
@@ -235,6 +265,10 @@ export function validateOptions({ options }: { options?: Options & { id?: string
 	}
 	if (value.suggestions && !Array.isArray(value.suggestions)) throw new Error(`${NAME}: suggestions must be a list of questions.`);
 	if (value.server && typeof value.server.url !== "string") throw new Error(`${NAME}: server needs a url.`);
+	if (value.server?.model !== undefined && typeof value.server.model !== "string") throw new Error(`${NAME}: server.model must be a string.`);
+	if (value.skills && (!Array.isArray(value.skills) || value.skills.some((ref) => typeof ref !== "string" || !ref))) {
+		throw new Error(`${NAME}: skills must be a list of skill refs, e.g. ["/"] or ["owner/repo/path#commit"].`);
+	}
 	if (value.fallback && !["ask", "auto"].includes(value.fallback)) throw new Error(`${NAME}: fallback must be "ask" or "auto".`);
 	// Docusaurus fills in the instance id only for plugins without a validator.
 	return { ...value, id: value.id ?? "default" };
