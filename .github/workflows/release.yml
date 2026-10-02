@@ -83,7 +83,11 @@ jobs:
           cp "$dmg" "Leuria-mac-${{ matrix.name }}.dmg"
           gh release upload "v$version" "Leuria-mac-${{ matrix.name }}.dmg" --clobber
           gh release delete-asset "v$version" "$(basename "$dmg")" --yes
-          for sig in "$bundle"/macos/*.app.tar.gz.sig; do gh release delete-asset "v$version" "$(basename "$sig")" --yes; done
+          # tauri-action names the upload after the arch (Leuria_aarch64.app.tar.gz.sig), not the
+          # local file; both jobs may see each other's, hence || true.
+          for sig in $(gh release view "v$version" --json assets -q '.assets[].name | select(endswith(".app.tar.gz.sig"))'); do
+            gh release delete-asset "v$version" "$sig" --yes || true
+          done
 
   windows:
     # Native builds: x64, and ARM64 for Windows on ARM (Snapdragon laptops,
