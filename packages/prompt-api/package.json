@@ -1,6 +1,6 @@
 {
   "name": "@leuria/prompt-api",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The Prompt API (LanguageModel) in every browser, served by the visitor's own AI through Leuria when the browser has no built-in model.",
   "license": "Apache-2.0",
   "type": "module",

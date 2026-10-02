@@ -1,6 +1,6 @@
 {
   "name": "@leuria/docs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ask AI and search by meaning for any docs site, on the reader's own AI: the corpus, the docs tools and the <leuria-ask> panel.",
   "license": "Apache-2.0",
   "type": "module",

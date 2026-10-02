@@ -1,6 +1,6 @@
 {
   "name": "@leuria/react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "React hooks for Leuria: the visitor's AI, conversations and the connect flow, as React state.",
   "license": "Apache-2.0",
   "type": "module",

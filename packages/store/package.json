@@ -1,6 +1,6 @@
 {
   "name": "@leuria/store",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A vector index in the visitor's browser (IndexedDB), built with whatever embedding model the visitor has, rebuilt when it changes.",
   "license": "Apache-2.0",
   "type": "module",
