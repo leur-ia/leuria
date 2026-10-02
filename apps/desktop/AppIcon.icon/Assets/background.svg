@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="53 30 256 256">
+  <defs>
+    <radialGradient id="blush" cx="0" cy="0" r="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#F9DCE6"/><stop offset="1" stop-color="#F9DCE6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ice" cx="1" cy="0" r="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#CDE8F7"/><stop offset="1" stop-color="#CDE8F7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mint" cx="1" cy="1" r="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#D3F3E6"/><stop offset="1" stop-color="#D3F3E6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lavender" cx="0" cy="1" r="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#D9D0FF"/><stop offset="1" stop-color="#D9D0FF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g>
+    <rect x="53" y="30" width="256" height="256" fill="#EEF0F7"/>
+    <rect x="53" y="30" width="256" height="256" fill="url(#blush)" opacity=".7"/>
+    <rect x="53" y="30" width="256" height="256" fill="url(#ice)" opacity=".8"/>
+    <rect x="53" y="30" width="256" height="256" fill="url(#mint)" opacity=".85"/>
+    <rect x="53" y="30" width="256" height="256" fill="url(#lavender)" opacity=".8"/>
+  </g>
+</svg>

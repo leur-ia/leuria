@@ -12,6 +12,7 @@
     "ui:dev": "vite",
     "ui:build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit",
+    "icon:mac": "xcrun actool AppIcon.icon --compile src-tauri/icons --output-partial-info-plist /dev/null --app-icon AppIcon --enable-on-demand-resources NO --target-device mac --minimum-deployment-target 11.0 --platform macosx && rm src-tauri/icons/AppIcon.icns",
     "tauri": "tauri",
     "test": "vitest run"
   },
