@@ -10,6 +10,7 @@
 
 import { fileText, messageFiles, messageText } from "../messages.js";
 import type { Message, MessagePart, ProviderSession, SessionOptions, TurnContext } from "../types.js";
+import { sseEvents } from "../sse.js";
 import { BaseProvider } from "./base.js";
 
 export interface ServerProviderOptions {
@@ -134,7 +135,8 @@ class ServerSession implements ProviderSession {
 
 		let content = "";
 		const calls = new Map<number, ApiToolCall>();
-		for await (const data of sseData(res.body)) {
+		for await (const { data } of sseEvents(res.body)) {
+			if (!data) continue;
 			if (data === "[DONE]") break;
 			const chunk = JSON.parse(data) as {
 				choices?: Array<{
@@ -194,33 +196,6 @@ function userContent(message: Message): ApiContent {
 		else if (text !== null) content.push({ type: "text", text: `<file name="${file.filename ?? "attachment"}">\n${text}\n</file>` });
 	}
 	return content;
-}
-
-/** `data:` payloads of a server-sent event stream. */
-export async function* sseData(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
-	const reader = body.getReader();
-	const decoder = new TextDecoder();
-	let buffer = "";
-	try {
-		for (;;) {
-			const { value, done } = await reader.read();
-			if (done) break;
-			buffer += decoder.decode(value, { stream: true });
-			let index: number;
-			while ((index = buffer.search(/\r?\n\r?\n/)) >= 0) {
-				const block = buffer.slice(0, index);
-				buffer = buffer.slice(index).replace(/^\r?\n\r?\n/, "");
-				const data = block
-					.split(/\r?\n/)
-					.filter((line) => line.startsWith("data:"))
-					.map((line) => line.slice(5).trimStart())
-					.join("\n");
-				if (data) yield data;
-			}
-		}
-	} finally {
-		reader.releaseLock();
-	}
 }
 
 export function server(options: ServerProviderOptions): ServerProvider {

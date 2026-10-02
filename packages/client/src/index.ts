@@ -28,29 +28,19 @@ export type {
 } from "./conversation.js";
 export { ChatRun } from "./run.js";
 export { AbortError, LeuriaError, NoProviderError, StructuredOutputError, TimeoutError } from "./errors.js";
-export {
-	defaultFormatContext,
-	fileText,
-	messageFiles,
-	messageText,
-	newId,
-	parseDataUrl,
-	promptText,
-	toMessage,
-	transcript,
-} from "./messages.js";
+export { dataUrl, messageFiles, messageText, newId } from "./messages.js";
 export type { ContextFormatter } from "./messages.js";
-export { extractJson, SUBMIT_TOOL } from "./structured.js";
+export { extractJson } from "./structured.js";
 
 export { BaseProvider } from "./providers/base.js";
 export { bridge, BridgeProvider, leuria } from "./providers/bridge.js";
 export type { BridgeProviderOptions } from "./providers/bridge.js";
 export { browserAI, BrowserAIProvider, promptAPI } from "./providers/browser.js";
 export type { BrowserAIOptions } from "./providers/browser.js";
-export { server, ServerProvider, sseData } from "./providers/server.js";
+export { server, ServerProvider } from "./providers/server.js";
 export type { ServerProviderOptions } from "./providers/server.js";
 
-export { BridgeClient, BridgeSession, DEFAULT_URL, LeuriaNotConnectedError, LeuriaNotRunningError, leuriaRunsHere } from "./bridge/transport.js";
+export { BridgeClient, LeuriaNotConnectedError, LeuriaNotRunningError, leuriaRunsHere } from "./bridge/transport.js";
 export type {
 	BridgeAttachment,
 	BridgeClientOptions,

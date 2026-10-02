@@ -22,20 +22,6 @@ export function costWords(cost: Cost | undefined, aiName: string): string {
 	return "";
 }
 
-/** "Its own tools, quick tasks": what the site said it needs; empty when it said nothing. */
-export function needsWords(needs: SiteNeeds | null | undefined): string {
-	if (!needs) return "";
-	const words: string[] = [];
-	if (needs.effort === "light") words.push("quick tasks");
-	if (needs.effort === "standard") words.push("everyday tasks");
-	if (needs.effort === "deep") words.push("hard, long tasks");
-	if (needs.tools) words.push("its own tools");
-	if (needs.images) words.push("images");
-	if (needs.context && needs.context > 32_000) words.push("long texts");
-	const text = words.join(", ");
-	return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
-}
-
 /** A label after a model's name, for a site that declared its needs. */
 export function verdictWords(verdict: Verdict | undefined): string {
 	if (verdict === "more") return " · More than this site needs";

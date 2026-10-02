@@ -201,6 +201,11 @@ export function failureText(error: unknown, fallback: string): string {
 	return error instanceof EngineOutdated ? error.message : fallback;
 }
 
+/** An error's own message. */
+export function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
 export const engine = {
 	status: () => call<Status>("GET", "/status"),
 	agents: () => call<{ agents: AgentChoice[] }>("GET", "/agents").then((r) => r.agents),
@@ -237,7 +242,6 @@ export const engine = {
 	setSiteAgent: (origin: string, agent: string | null) =>
 		call<{ origin: string; agent: string | null; signIn: SignInStatus }>("POST", "/sites/agent", { origin, agent }),
 	disconnect: (origin: string) => call<{ removed: boolean }>("DELETE", `/sites?origin=${encodeURIComponent(origin)}`),
-	pairing: () => call<{ requests: PairingRequest[] }>("GET", "/pairing").then((r) => r.requests),
 	/** Allow or refuse a site; on Allow, optionally its AI (null: the default) and model from the first message. */
 	decide: (requestId: string, allow: boolean, choice: SiteChoice = {}) => call<{ ok: boolean }>("POST", `/pairing/${requestId}`, { allow, ...choice }),
 	/** How Your AIs fit a site: the needs of a request being approved, or those of a connected site. */

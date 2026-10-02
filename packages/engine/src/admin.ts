@@ -18,13 +18,10 @@
  *   POST   /admin/agent/reset { id }  forget an agent that failed (install and Leuria's sign-in), to start over
  *   GET    /admin/sites               connected sites, each with its AI override and declared needs if any
  *   POST   /admin/fit     { needs?, origin? } how Your AIs and their models fit a site's needs, and the one to recommend
- *   GET    /admin/providers           LLM providers (LM Studio, Ollama, APIs) with their models
  *   POST   /admin/providers { name, baseUrl, apiKey? } add or update an OpenAI-compatible API (tested first)
- *   DELETE /admin/providers?id=…      remove one
  *   POST   /admin/sites/agent { origin, agent|null } use another AI for one site (installs it)
  *   POST   /admin/sites/model { origin, model|null } use another model for one site (for the site's AI)
  *   DELETE /admin/sites?origin=…      disconnect a site
- *   GET    /admin/pairing             sites waiting for approval
  *   POST   /admin/pairing/link { origin, app?, nonce, needs? } a leuria://connect link reached the app: ask the visitor
  *   POST   /admin/pairing/:id { allow, agent?, model? } approve or refuse a site; on Allow, optionally its AI (null: the default) and model
  *   POST   /admin/test  { agent? }    real round trip with an AI, the default one without `agent` (`leuria test`)
@@ -52,7 +49,7 @@ import type { SessionManager } from "./session-manager.js";
 import { resolveAgentCommand } from "./agents.js";
 import { VERSION } from "./version.js";
 
-export interface AdminContext {
+interface AdminContext {
 	/** Mutable: choosing an agent changes it for the next sessions. */
 	config: EngineConfig;
 	grants: GrantStore;
@@ -128,22 +125,6 @@ export function createAdminHandler(ctx: AdminContext) {
 			sendJson(res, 200, { agents: [...models, ...agents] });
 			return true;
 		}
-		if (route === "GET /providers") {
-			const llms = await detectLlms();
-			sendJson(res, 200, {
-				providers: llms.map(({ provider, running, models, error }) => ({
-					id: provider.id,
-					kind: provider.kind,
-					name: provider.name,
-					baseUrl: provider.baseUrl,
-					hasApiKey: Boolean(provider.apiKey),
-					running,
-					models,
-					error,
-				})),
-			});
-			return true;
-		}
 		if (route === "POST /providers") {
 			const body = (await parseBody(req)) as { id?: unknown; name?: unknown; baseUrl?: unknown; apiKey?: unknown };
 			if (typeof body.name !== "string" || !body.name.trim() || typeof body.baseUrl !== "string" || !body.baseUrl.trim()) {
@@ -174,11 +155,6 @@ export function createAdminHandler(ctx: AdminContext) {
 			}
 			const provider = saveProvider(candidate);
 			sendJson(res, 200, { id: provider.id, name: provider.name, baseUrl: provider.baseUrl, models });
-			return true;
-		}
-		if (route === "DELETE /providers") {
-			const id = new URL(req.url ?? "", "http://127.0.0.1").searchParams.get("id");
-			sendJson(res, 200, { removed: id ? removeProvider(id) : false });
 			return true;
 		}
 		if (route === "GET /ais") {
@@ -393,10 +369,6 @@ export function createAdminHandler(ctx: AdminContext) {
 			sendJson(res, 200, await fitAis(ctx, needs));
 			return true;
 		}
-		if (route === "GET /pairing") {
-			sendJson(res, 200, { requests: pairing.pending() });
-			return true;
-		}
 		if (route === "POST /pairing/link") {
 			// A leuria://connect link reached the app: ask the visitor, and let that site claim.
 			const result = pairing.link((await parseBody(req)) as { origin?: unknown; app?: unknown; nonce?: unknown; needs?: unknown });
@@ -497,7 +469,7 @@ async function candidates(ctx: AdminContext): Promise<Array<Candidate & { name: 
 }
 
 /** How Your AIs fit `needs`: a verdict per AI and model, and the cheapest that is enough. */
-export async function fitAis(ctx: AdminContext, needs: SiteNeeds | undefined) {
+async function fitAis(ctx: AdminContext, needs: SiteNeeds | undefined) {
 	const all = await candidates(ctx);
 	const best = recommend(needs, all);
 	const order: Verdict[] = ["fits", "more", "short"];

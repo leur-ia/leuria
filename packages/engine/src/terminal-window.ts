@@ -15,7 +15,7 @@ import { join } from "node:path";
 
 import { removeScratch } from "./scratch.js";
 
-export interface TerminalWindowOptions {
+interface TerminalWindowOptions {
 	/** The window's title, and its first line: what it is for, in plain words. */
 	title: string;
 	command: string;
@@ -24,9 +24,10 @@ export interface TerminalWindowOptions {
 	env: Record<string, string>;
 	cwd: string;
 	signal?: AbortSignal;
-	/** Give up after this long (default 15 minutes). */
-	timeoutMs?: number;
 }
+
+/** Give up after this long. */
+const TIMEOUT_MS = 15 * 60_000;
 
 /** Can Leuria open a terminal window here? */
 export function canOpenTerminalWindow(): boolean {
@@ -55,7 +56,7 @@ export async function runInTerminalWindow(options: TerminalWindowOptions): Promi
 			chmodSync(script, 0o700);
 			spawn("open", ["-a", "Terminal", script], { detached: true, stdio: "ignore" }).unref();
 		}
-		return await waitFor(done, options.signal, options.timeoutMs ?? 15 * 60_000);
+		return await waitFor(done, options.signal, TIMEOUT_MS);
 	} finally {
 		removeScratch(dir);
 	}

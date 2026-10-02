@@ -15,7 +15,7 @@ import type { Logger } from "./logger.js";
 import { startEngine } from "./server.js";
 import type { AgentLaunch } from "./session-manager.js";
 
-export interface SelfTestResult {
+interface SelfTestResult {
 	ok: boolean;
 	steps: Array<{ name: string; ok: boolean; detail: string }>;
 }

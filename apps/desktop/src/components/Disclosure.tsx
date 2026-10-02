@@ -1,6 +1,6 @@
 import { Icon } from "@leuria/pearl";
-import { Button, Flex } from "@radix-ui/themes";
-import { type ReactNode, useId, useState } from "react";
+import { Box, Button } from "@radix-ui/themes";
+import type { ReactNode } from "react";
 
 /**
  * An advanced option, folded away: one quiet line that
@@ -22,29 +22,18 @@ export function Disclosure({
 	/** Called each time it opens, e.g. to load what it shows. */
 	onOpen?: () => void;
 }) {
-	const [open, setOpen] = useState(defaultOpen);
-	const id = useId();
 	return (
-		<Flex direction="column" gap="2">
-			<Button
-				variant="ghost"
-				color="gray"
-				size="1"
-				aria-expanded={open}
-				aria-controls={id}
-				style={{ alignSelf: "flex-start" }}
-				onClick={() => {
-					if (!open) onOpen?.();
-					setOpen(!open);
-				}}
-			>
-				<span className={open ? "disclosure-chevron open" : "disclosure-chevron"}>
-					<Icon name="chevron-down" size={14} />
-				</span>
-				{label}
-				{value ? ` · ${value}` : ""}
+		<details className="disclosure" open={defaultOpen} onToggle={(e) => e.currentTarget.open && onOpen?.()}>
+			<Button asChild variant="ghost" color="gray" size="1">
+				<summary>
+					<span className="disclosure-chevron">
+						<Icon name="chevron-down" size={14} />
+					</span>
+					{label}
+					{value ? ` · ${value}` : ""}
+				</summary>
 			</Button>
-			{open && <div id={id}>{children}</div>}
-		</Flex>
+			<Box mt="2">{children}</Box>
+		</details>
 	);
 }

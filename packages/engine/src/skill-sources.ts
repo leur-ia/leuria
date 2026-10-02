@@ -40,7 +40,7 @@ export interface SkillContent {
 	files: Record<string, string>;
 }
 
-export type SkillSource =
+type SkillSource =
 	| { kind: "github"; repo: string; ref?: string; subpath?: string; skill?: string }
 	| { kind: "site"; url: string };
 

@@ -15,34 +15,12 @@ export { PageEmbedder } from "./provider.js";
 /** The Transformers.js this package is tested with. */
 export const TRANSFORMERS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/+esm";
 
-/** The worker, as ./worker.js does it, with Transformers.js from `from`. Keep the two in step. */
+/** ./listen.js as text, inlined by the build (tsup.config.ts). */
+declare const WORKER_LISTEN: string;
+
+/** The worker, as ./worker.js does it, with Transformers.js from `from`. */
 function workerSource(from: string): string {
-	return `import { env, pipeline } from ${JSON.stringify(from)};
-let extractor = null;
-self.onmessage = async ({ data }) => {
-	const { id, type } = data;
-	try {
-		if (type === "load") {
-			env.allowLocalModels = false;
-			if (data.remoteHost) env.remoteHost = data.remoteHost;
-			extractor ??= await pipeline("feature-extraction", data.model, {
-				dtype: "q8",
-				progress_callback: (event) => {
-					if (event.status !== "progress_total") return;
-					const progress = event.total ? (event.loaded ?? 0) / event.total : (event.progress ?? 0) / 100;
-					self.postMessage({ id, type: "progress", progress });
-				},
-			});
-			self.postMessage({ id, type: "done" });
-		} else if (type === "embed") {
-			const output = await extractor(data.texts, { pooling: "mean", normalize: true });
-			self.postMessage({ id, type: "done", vectors: output.tolist() });
-		}
-	} catch (error) {
-		self.postMessage({ id, type: "error", message: error instanceof Error ? error.message : String(error) });
-	}
-};
-`;
+	return `${WORKER_LISTEN}\nimport { env, pipeline } from ${JSON.stringify(from)};\nlisten(env, pipeline);\n`;
 }
 
 export function pageEmbedder(options: PageEmbedderOptions & { transformersUrl?: string } = {}): PageEmbedder {

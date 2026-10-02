@@ -48,7 +48,7 @@ describe("decidePermission", () => {
 
 describe("buildSessionMeta", () => {
 	it("removes built-in tools, user settings and bypass mode", () => {
-		const meta = buildSessionMeta({ systemPrompt: "compose views", model: "sonnet" });
+		const meta = buildSessionMeta({ systemPrompt: "compose views" });
 		const opts = (meta.claudeCode as { options: Record<string, unknown> }).options;
 		expect(opts.tools).toEqual([]);
 		expect(opts.settingSources).toEqual([]);
@@ -56,7 +56,6 @@ describe("buildSessionMeta", () => {
 		expect(opts.allowDangerouslySkipPermissions).toBe(false);
 		expect(opts.allowedTools).toEqual(["mcp__webmcp"]);
 		expect(opts.disallowedTools).toContain("Bash");
-		expect(opts.model).toBe("sonnet");
 		expect(meta.systemPrompt).toBe("compose views");
 	});
 });

@@ -33,14 +33,14 @@ function isLocal(provider: LlmProvider): boolean {
 	return host === "127.0.0.1" || host === "localhost" || host === "[::1]";
 }
 
-export interface EmbeddingModel {
+interface EmbeddingModel {
 	id: string;
 	/** LM Studio reports whether it is loaded in memory (it answers at once). */
 	loaded?: boolean;
 }
 
 /** Embedding models of a local service, loaded ones first. Empty when it isn't running. */
-export async function listEmbeddingModels(provider: LlmProvider, timeoutMs = 1500): Promise<EmbeddingModel[]> {
+async function listEmbeddingModels(provider: LlmProvider, timeoutMs = 1500): Promise<EmbeddingModel[]> {
 	const root = provider.baseUrl.replace(/\/v\d+$/, "");
 	const get = <T>(url: string) =>
 		fetch(url, { headers: authHeaders(provider), signal: AbortSignal.timeout(timeoutMs) })
@@ -147,8 +147,8 @@ export function localEmbeddings(choice: () => EmbedChoice | undefined = () => lo
 	};
 }
 
-export const MAX_EMBED_TEXTS = 256;
-export const MAX_EMBED_CHARS = 8000;
+const MAX_EMBED_TEXTS = 256;
+const MAX_EMBED_CHARS = 8000;
 
 /** Validate `POST /embed`'s body. Throws on bad input. */
 export function parseEmbedBody(body: unknown): { texts: string[]; kind: "query" | "document" } {

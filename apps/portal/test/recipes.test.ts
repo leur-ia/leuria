@@ -64,7 +64,7 @@ class FakeAI extends BaseProvider {
 				if (options.schema) return { text: JSON.stringify(fake(options.schema)) };
 				for (const tool of options.tools) {
 					const outcome = await context.runTool({ name: tool.name, args: fake(tool.inputSchema) as Record<string, unknown> });
-					if (tool.name === client.SUBMIT_TOOL && outcome.ok) return { text: "" };
+					if (tool.name === "submit_result" && outcome.ok) return { text: "" };
 				}
 				context.text("A short answer.");
 				return { text: "A short answer." };

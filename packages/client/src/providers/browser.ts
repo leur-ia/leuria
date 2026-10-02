@@ -148,18 +148,9 @@ class BrowserSession implements ProviderSession {
 			...(this.options.schema ? { responseConstraint: this.options.schema } : {}),
 		});
 		let text = "";
-		const reader = stream.getReader();
-		try {
-			for (;;) {
-				const { value, done } = await reader.read();
-				if (done) break;
-				// Early Chrome versions streamed the whole text so far; later ones stream deltas.
-				const delta = text && value.startsWith(text) ? value.slice(text.length) : value;
-				text += delta;
-				context.text(delta);
-			}
-		} finally {
-			reader.releaseLock();
+		for await (const delta of stream) {
+			text += delta;
+			context.text(delta);
 		}
 		return { text };
 	}

@@ -11,7 +11,7 @@
 
 import { homePath, readJson, writeJson } from "../home.js";
 
-export type LlmKind = "lmstudio" | "ollama" | "openai";
+type LlmKind = "lmstudio" | "ollama" | "openai";
 
 export interface LlmProvider {
 	id: string;
@@ -23,7 +23,7 @@ export interface LlmProvider {
 	apiKey?: string;
 }
 
-export interface LlmModel {
+interface LlmModel {
 	id: string;
 	/** LM Studio reports whether the model is loaded in memory. */
 	loaded?: boolean;
@@ -224,7 +224,7 @@ export function unreachable(provider: LlmProvider): string {
 	return `Couldn't reach ${provider.name} at ${provider.baseUrl}.`;
 }
 
-export interface DetectedLlm {
+interface DetectedLlm {
 	provider: LlmProvider;
 	running: boolean;
 	models: LlmModel[];

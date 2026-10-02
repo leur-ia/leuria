@@ -1,7 +1,7 @@
 import { createStore } from "@sinuxjs/core";
 
 import { appStore } from "./app.store";
-import { type AgentChoice, type AgentModels, engine, failureText, friendlyName, plainReason, onEngine, type SignInStatus, type TestResult } from "../engine";
+import { type AgentChoice, type AgentModels, engine, errorMessage, failureText, friendlyName, plainReason, onEngine, type SignInStatus, type TestResult } from "../engine";
 
 export type Step =
 	| { kind: "choose" }
@@ -101,10 +101,6 @@ export function byRelevance(a: AgentChoice, b: AgentChoice): number {
 	return rank(b) - rank(a) || order(a) - order(b);
 }
 
-function message(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
 /** Run the check and land on the result. */
 async function check(agent: AgentChoice): Promise<Partial<OnboardingState>> {
 	onboardingStore.updateState({ step: { kind: "checking", agent }, progress: "" });
@@ -160,7 +156,7 @@ export const onboardingStore = createStore(initial, {
 				api: { preset: "other", name: "", baseUrl: "", apiKey: "", busy: false, error: first ? "" : "Connected, but this service lists no chat model." },
 			};
 		} catch (error) {
-			return { api: { ...state.api, busy: false, error: message(error) } as ApiForm };
+			return { api: { ...state.api, busy: false, error: errorMessage(error) } as ApiForm };
 		}
 	},
 	showAll: () => ({ showAll: true }),

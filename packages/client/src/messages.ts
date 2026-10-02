@@ -42,12 +42,16 @@ function isBlob(value: FileInput): value is Blob {
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
-	const bytes = new Uint8Array(await blob.arrayBuffer());
+	return dataUrl(new Uint8Array(await blob.arrayBuffer()), blob.type || "application/octet-stream");
+}
+
+/** Bytes as a base64 `data:` URL. */
+export function dataUrl(bytes: Uint8Array, mediaType: string): string {
 	let binary = "";
 	for (let i = 0; i < bytes.length; i += 0x8000) {
 		binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
 	}
-	return `data:${blob.type || "application/octet-stream"};base64,${btoa(binary)}`;
+	return `data:${mediaType};base64,${btoa(binary)}`;
 }
 
 /** Concatenated text parts of a message. */

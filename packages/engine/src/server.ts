@@ -32,9 +32,7 @@ import { SkillService } from "./skills.js";
 import { VERSION } from "./version.js";
 import { WebMcpServer } from "./webmcp-server.js";
 
-export { DEFAULT_PORT, VERSION };
-
-export interface EngineOptions {
+interface EngineOptions {
 	port?: number;
 	grants: GrantStore;
 	logger: Logger;
@@ -117,9 +115,9 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 		onAgentState: options.onAgentState,
 	});
 	// A revoked site loses its running agents too.
-	grants.onRemoved((origin) => sessions.closeOrigin(origin));
+	grants.onRemoved((origin) => sessions.closeWhere((o) => o === origin));
 	// A site's AI or model changed: its open conversation ends, the next message uses the new one.
-	grants.onChanged((origin) => sessions.closeOrigin(origin));
+	grants.onChanged((origin) => sessions.closeWhere((o) => o === origin));
 	const pairing = new Pairing({
 		grants,
 		logger,

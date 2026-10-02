@@ -43,7 +43,7 @@ sequenceDiagram
   V->>L: Allow
   E-->>P: { status: "allowed", token }
   P->>E: POST /session/prepare (Bearer token)
-  E-->>P: 201 { sessionId, registrationToken, webmcpUrl }
+  E-->>P: 201 { sessionId, registrationToken }
   P->>E: WS /webmcp/register { register, token }
   E-->>P: { registerSuccess, channel, token }
   P->>E: WS channel: registerTool × n
@@ -154,14 +154,14 @@ A session is one running AI for one page, with that page's tools.
 
 | Method and path | Body | Response |
 | --- | --- | --- |
-| `POST /session/prepare` | `{ prompt?, attachments?, systemPrompt?, maxTurns?, skills? }` | `201 { sessionId, status: "pending_approval", registrationToken, webmcpUrl }` |
+| `POST /session/prepare` | `{ prompt?, attachments?, systemPrompt?, maxTurns?, skills? }` | `201 { sessionId, status: "pending_approval", registrationToken }` |
 | `GET /session/:id/stream` | | Server-sent events, see [Stream events](#stream-events) |
 | `POST /session/:id/approve` | | Starts the AI and sends `prompt`, if any. Without a prompt the session goes `idle` and emits `ready` (a warm start) |
 | `POST /session/:id/prompt` | `{ prompt, attachments? }` | A follow-up turn on an `idle` session |
 | `POST /session/:id/cancel-turn` | | Stops the current turn and keeps the session |
 | `POST /session/:id/cancel` | | Ends the session: `cancelled` |
 | `POST /session/:id/close` | | Ends the session: `completed` |
-| `GET /session/:id` | | `{ id, status, origin, createdAt, error?, registrationToken, webmcpUrl }` |
+| `GET /session/:id` | | `{ id, status, origin, createdAt, error?, registrationToken }` |
 
 The `POST` actions answer `200 { sessionId, status }`. An action the current status doesn't allow answers `400` with the reason. Examples: `approve` twice, or `prompt` while a turn runs or after the AI has ended.
 
@@ -214,7 +214,7 @@ data: <JSON>
 
 | Event | Data |
 | --- | --- |
-| `webmcp_ready` | `{ registrationToken, webmcpUrl }`. Sent on `approve`, and again on every new stream once approved |
+| `webmcp_ready` | `{ registrationToken }`. Sent on `approve`, and again on every new stream once approved |
 | `ready` | `null`. The AI is up and idle. Sent after a prompt-less `approve`, and on a new stream to an `idle` session |
 | `turn_start` | `null` |
 | `chunk` | The AI's text, as a JSON string. A new stream replays the current turn's chunks |
@@ -233,7 +233,6 @@ data: <JSON>
 The page's tools run in the page. The engine relays the AI's calls to them over a WebSocket channel. Browsers can't set headers on WebSockets, so an upgrade is allowed when the page's origin has a grant. The tokens below do the rest. Upgrades from origins without a grant get `403`.
 
 **Tokens.**
-- `webmcpUrl` is `http://127.0.0.1:<port>`.
 - `registrationToken` is base64 of `{ "server": "ws://127.0.0.1:<port>", "token": "<one-time token>" }`. Send it as it is: the engine accepts the whole blob, or just the inner token.
 
 **Handshake.**

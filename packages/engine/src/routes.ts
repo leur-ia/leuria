@@ -24,7 +24,7 @@ import { parseSkillRefs } from "./skills.js";
 const MAX_ATTACHMENTS = 10;
 
 /** Validate `attachments` from a request body. Throws on bad input. */
-export function parseAttachments(value: unknown): PromptAttachment[] {
+function parseAttachments(value: unknown): PromptAttachment[] {
 	if (value === undefined) return [];
 	if (!Array.isArray(value)) throw new Error("attachments must be an array");
 	if (value.length > MAX_ATTACHMENTS) throw new Error(`At most ${MAX_ATTACHMENTS} attachments`);
@@ -151,7 +151,6 @@ async function handlePrepare(
 		sessionId: info.id,
 		status: info.status,
 		registrationToken: info.registrationToken,
-		webmcpUrl: info.webmcpUrl,
 	});
 }
 

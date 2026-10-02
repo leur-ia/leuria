@@ -540,7 +540,7 @@ function AiRow({
 			</Flex>
 			{models && models.options.length > 1 && (
 				<Disclosure label="Model" value={models.options.find((m) => m.id === models.current)?.name}>
-					<AgentModelSelect models={models} showLabel={false} onChange={(id) => void (ai.default ? appStore.setModel(id) : homeStore.setAiModel(ai.id, id))} />
+					<AgentModelSelect models={models} onChange={(id) => void (ai.default ? appStore.setModel(id) : homeStore.setAiModel(ai.id, id))} />
 				</Disclosure>
 			)}
 			{refresh === "running" && (

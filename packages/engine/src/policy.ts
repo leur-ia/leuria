@@ -47,7 +47,6 @@ const BUILT_IN_TOOLS = [
 export interface SessionConfig {
 	/** System prompt. Replaces the adapter's coding-agent preset. */
 	systemPrompt?: string;
-	model?: string;
 	maxTurns?: number;
 }
 
@@ -63,7 +62,6 @@ export function buildSessionMeta(
 		strictMcpConfig: true,
 		allowDangerouslySkipPermissions: false,
 	};
-	if (config.model) options.model = config.model;
 	if (config.maxTurns) options.maxTurns = config.maxTurns;
 
 	const meta: Record<string, unknown> = { claudeCode: { options } };

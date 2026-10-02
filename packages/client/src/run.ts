@@ -50,10 +50,6 @@ export class ChatRun<T = unknown> implements AsyncIterable<ChatEvent> {
 		return this.controller.signal;
 	}
 
-	get finished(): boolean {
-		return this.done;
-	}
-
 	/** Call `listener` for every event, past and future. Returns the unsubscribe function. */
 	on(listener: (event: ChatEvent) => void): () => void {
 		for (const event of this.events) listener(event);

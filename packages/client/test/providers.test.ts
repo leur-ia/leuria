@@ -124,13 +124,6 @@ describe("browser AI provider", () => {
 		]);
 		expect(await ai.chat({ prompt: "json", schema: { type: "object" } }).object()).toEqual({ ok: true });
 	});
-
-	it("handles browsers that stream the whole text so far", async () => {
-		fakeLanguageModel("available", () => ["Hel", "Hello", "Hello world"]);
-		const ai = createLeuria({ providers: [browserAI()], autoDetect: false });
-		await ai.detect();
-		expect(await ai.chat({ prompt: "x" }).text()).toBe("Hello world");
-	});
 });
 
 describe("bridge provider", () => {

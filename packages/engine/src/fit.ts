@@ -9,11 +9,11 @@
 import type { Effort, SiteNeeds } from "./needs.js";
 
 /** How strong a model is: quick answers, everyday work with tools, hard tasks. */
-export type Tier = "small" | "medium" | "large";
+type Tier = "small" | "medium" | "large";
 /** What using it costs the visitor: nothing (on this computer), their plan's limits, or money per use. */
 export type Cost = "free" | "plan" | "paid";
 
-export interface ModelTraits {
+interface ModelTraits {
 	tools?: boolean;
 	images?: boolean;
 	context?: number;
@@ -30,7 +30,7 @@ const NEEDED: Record<Effort, Tier> = { light: "small", standard: "medium", deep:
 const COST: Record<Cost, number> = { free: 0, plan: 1, paid: 2 };
 
 /** By size: under 9B quick answers, up to 40B everyday work, above that hard tasks. */
-export function tierFromParams(billions: number): Tier {
+function tierFromParams(billions: number): Tier {
 	return billions < 9 ? "small" : billions <= 40 ? "medium" : "large";
 }
 

@@ -28,12 +28,12 @@ interface ApiToolCall {
 	function: { name: string; arguments: string };
 }
 
-export interface PageTools {
+interface PageTools {
 	list: () => Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>;
 	call: (name: string, args: Record<string, unknown>) => Promise<unknown>;
 }
 
-export interface LlmSessionOptions {
+interface LlmSessionOptions {
 	provider: LlmProvider;
 	model: string;
 	systemPrompt?: string;
@@ -43,7 +43,6 @@ export interface LlmSessionOptions {
 	onChunk?: (text: string) => void;
 	onThought?: (text: string) => void;
 	onToolCall?: (event: ToolCallEvent) => void;
-	fetch?: typeof fetch;
 }
 
 export class LlmSession {
@@ -63,7 +62,7 @@ export class LlmSession {
 	async start(): Promise<{ error?: string }> {
 		const { provider } = this.options;
 		try {
-			const res = await (this.options.fetch ?? fetch)(`${provider.baseUrl}/models`, {
+			const res = await fetch(`${provider.baseUrl}/models`, {
 				headers: authHeaders(provider),
 				signal: AbortSignal.timeout(5000),
 			});
@@ -147,7 +146,7 @@ export class LlmSession {
 
 		let res: Response;
 		try {
-			res = await (this.options.fetch ?? fetch)(`${provider.baseUrl}/chat/completions`, {
+			res = await fetch(`${provider.baseUrl}/chat/completions`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...authHeaders(provider) },
 				body: JSON.stringify(body),

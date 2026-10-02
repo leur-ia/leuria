@@ -27,12 +27,7 @@ export interface ConnectButtonProps extends ElementProps {
 
 /** "Connect your AI", one per page (`<leuria-connect-button>`). */
 export function ConnectButton({ size, byline = true, onDisconnect, ...props }: ConnectButtonProps): ReactElement {
-	return useLeuriaElement(
-		"leuria-connect-button",
-		{ size, "hide-byline": !byline },
-		props,
-		{ "leuria-disconnect": onDisconnect },
-	);
+	return useLeuriaElement("leuria-connect-button", { size, "hide-byline": !byline }, props, { onDisconnect });
 }
 
 export interface AIStatusProps extends ElementProps {
@@ -42,7 +37,7 @@ export interface AIStatusProps extends ElementProps {
 
 /** Which AI answers right now, as a dot and words (`<leuria-ai-status>`). */
 export function AIStatus({ labels, ...props }: AIStatusProps): ReactElement {
-	return useLeuriaElement("leuria-ai-status", {}, props, {}, { labels });
+	return useLeuriaElement("leuria-ai-status", {}, props, { labels });
 }
 
 export interface LeuriaBadgeProps extends ElementProps {

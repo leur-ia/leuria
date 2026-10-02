@@ -6,6 +6,8 @@
  * this class is what that provider is built on.
  */
 
+import { sseEvents } from "../sse.js";
+
 export const DEFAULT_URL = "http://127.0.0.1:19570";
 
 export type BridgeStatus = "offline" | "unpaired" | "ready";
@@ -401,11 +403,7 @@ export class BridgeSession {
 	/** Subscribe to session events; returns the unsubscribe function. */
 	onEvent(listener: (event: BridgeEvent) => void): () => void {
 		this.listeners.add(listener);
-		return () => this.off(listener);
-	}
-
-	off(listener: (event: BridgeEvent) => void): void {
-		this.listeners.delete(listener);
+		return () => this.listeners.delete(listener);
 	}
 
 	/** Follow-up prompt on an idle session; the agent keeps its context. */
@@ -481,21 +479,8 @@ export class BridgeSession {
 	}
 
 	private async consume(body: ReadableStream<Uint8Array>): Promise<void> {
-		const reader = body.getReader();
-		const decoder = new TextDecoder();
-		let buffer = "";
-		for (;;) {
-			const { value, done } = await reader.read();
-			if (done) return;
-			buffer += decoder.decode(value, { stream: true });
-			let index: number;
-			while ((index = buffer.indexOf("\n\n")) >= 0) {
-				const block = buffer.slice(0, index);
-				buffer = buffer.slice(index + 2);
-				const name = /^event: (.*)$/m.exec(block)?.[1];
-				const data = /^data: (.*)$/m.exec(block)?.[1];
-				if (name) this.dispatch(name, data ? (JSON.parse(data) as unknown) : null);
-			}
+		for await (const { event, data } of sseEvents(body)) {
+			if (event) this.dispatch(event, data ? (JSON.parse(data) as unknown) : null);
 		}
 	}
 

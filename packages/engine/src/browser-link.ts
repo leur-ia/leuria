@@ -15,7 +15,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 
-export interface BrowserLink {
+interface BrowserLink {
 	/** Environment for the agent: PATH with the catching command first. */
 	env: Record<string, string>;
 	stop(): void;

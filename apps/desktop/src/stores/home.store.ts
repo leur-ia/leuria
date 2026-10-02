@@ -1,7 +1,7 @@
 import { createStore } from "@sinuxjs/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 
-import { type AgentModels, engine, onEngine, failureText, type Fit, friendlyName, type SearchChoice, type SearchModels, type SignInStatus, type Site, type TestResult, type YourAi } from "../engine";
+import { type AgentModels, engine, errorMessage, onEngine, failureText, type Fit, friendlyName, type SearchChoice, type SearchModels, type SignInStatus, type Site, type TestResult, type YourAi } from "../engine";
 import { appStore } from "./app.store";
 
 /** The sidebar's pages. */
@@ -56,10 +56,6 @@ function safeOrigin(value: string): string {
 	} catch {
 		return value;
 	}
-}
-
-function message(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }
 
 export const homeStore = createStore(initial, {
@@ -203,7 +199,7 @@ export const homeStore = createStore(initial, {
 		homeStore.updateState({ settingUp: pending.origin });
 		const status = await engine.signIn(methodId, pending.agent, !methodId).catch((error: unknown) => ({
 			ok: false,
-			detail: message(error),
+			detail: errorMessage(error),
 			methods: pending.status.methods,
 		}));
 		return { settingUp: null, signInNeeded: status.ok ? null : { ...pending, status } };

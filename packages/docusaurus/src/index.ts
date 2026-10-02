@@ -75,7 +75,7 @@ export interface Options {
 	 * bigger. Default `{ tools: true, effort: "light" }`: it searches and reads
 	 * your pages, then answers.
 	 */
-	needs?: { tools?: boolean; images?: boolean; effort?: "light" | "standard" | "deep"; context?: number };
+	needs?: Needs;
 	/**
 	 * Skills that guide the reader's AI on your site, in the `npx skills`
 	 * syntax: `"/"` for your site's own `static/.well-known/agent-skills/`,
@@ -97,19 +97,12 @@ export interface Options {
 	docsPluginIds?: string[];
 }
 
+/** What the Ask panel needs from a model. */
+export type Needs = { tools?: boolean; images?: boolean; effort?: "light" | "standard" | "deep"; context?: number };
+
 /** What the client module gets, as JSON. */
-export interface ClientConfig {
-	app: string;
-	title?: string;
-	suggestions?: string[];
-	system?: string;
-	askButton: "navbar" | "floating" | "none";
-	webmcp: boolean;
-	server?: ServerOptions;
-	skills?: string[];
-	fallback: "ask" | "auto";
-	needs: { tools?: boolean; images?: boolean; effort?: "light" | "standard" | "deep"; context?: number };
-}
+export type ClientConfig = Pick<Options, "title" | "suggestions" | "system" | "server" | "skills"> &
+	Required<Pick<Options, "app" | "askButton" | "webmcp" | "fallback" | "needs">>;
 
 const NAME = "@leuria/docusaurus";
 

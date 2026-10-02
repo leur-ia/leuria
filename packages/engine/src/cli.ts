@@ -327,21 +327,20 @@ function stdioMcpSelf(): { command: string; args: string[] } {
 		: { command: process.execPath, args: [...process.execArgv, script, "mcp-stdio"] };
 }
 
-/**
- * `leuria start --app`: the engine inside the desktop app. It starts even
- * before an agent is chosen or signed in (the app runs onboarding through
- * the admin API), and reports events as JSON lines on stdout.
- */
-/**
- * The engine for the desktop app. `devPairing` (a debug build of the app,
- * `pnpm desktop`): macOS gives `leuria://` links only to a bundled app, so
- * a site's claim asks the visitor itself, as with the CLI, and the engine
- * answers every site. Never in a release build.
- */
 /** When the engine looks for newer versions of the installed AIs. */
 const AI_UPDATE_DELAY_MS = 30_000;
 const AI_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * `leuria start --app`: the engine inside the desktop app. It starts even
+ * before an agent is chosen or signed in (the app runs onboarding through
+ * the admin API), and reports events as JSON lines on stdout.
+ *
+ * `devPairing` (a debug build of the app, `pnpm desktop`): macOS gives
+ * `leuria://` links only to a bundled app, so a site's claim asks the
+ * visitor itself, as with the CLI, and the engine answers every site.
+ * Never in a release build.
+ */
 async function startForApp(config: EngineConfig, verbose: boolean, devPairing: boolean): Promise<void> {
 	const token = process.env.LEURIA_ADMIN_TOKEN;
 	if (!token || token.length < 32) throw new Error("LEURIA_ADMIN_TOKEN (32+ characters) is required with --app");

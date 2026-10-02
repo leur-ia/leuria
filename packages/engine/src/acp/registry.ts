@@ -17,7 +17,7 @@ interface PackageDistribution {
 	env?: Record<string, string>;
 }
 
-export interface BinaryTarget {
+interface BinaryTarget {
 	archive: string;
 	cmd: string;
 	args?: string[];

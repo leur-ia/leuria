@@ -93,10 +93,7 @@ export class LeuriaSearch extends LeuriaElement {
 	}
 
 	show(query?: string): void {
-		if (!this.dialog.open) {
-			if (this.dialog.showModal) this.dialog.showModal();
-			else this.dialog.setAttribute("open", "");
-		}
+		if (!this.dialog.open) this.dialog.showModal();
 		void pageDocs()?.load();
 		if (query !== undefined) this.input.value = query;
 		this.input.focus();
@@ -105,9 +102,7 @@ export class LeuriaSearch extends LeuriaElement {
 	}
 
 	hide(): void {
-		if (!this.dialog.open) return;
-		if (this.dialog.close) this.dialog.close();
-		else this.dialog.removeAttribute("open");
+		this.dialog.close();
 	}
 
 	refresh(): void {

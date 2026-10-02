@@ -104,7 +104,7 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 								<Select.Root
 									value={choice.agent ?? DEFAULT}
 									disabled={busy}
-									onValueChange={(value) => void pairingStore.pickAgent(value === DEFAULT ? null : value)}
+									onValueChange={(value) => void pairingStore.pick(value === DEFAULT ? null : value, null)}
 								>
 									<Select.Trigger aria-label={`AI for ${host}`} style={{ width: "100%" }} />
 									<Select.Content position="popper">

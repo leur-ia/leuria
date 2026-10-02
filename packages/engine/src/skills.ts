@@ -5,7 +5,7 @@
  * changes its list, never while a conversation starts.
  *
  * One cache for every site, by content (a community skill two sites use is
- * stored once), in `~/.leuria/skills` with cacache. Each site's grant keeps
+ * stored once), in `~/.leuria/skills`. Each site's grant keeps
  * which skills it uses, so a skill is only ever offered in that site's
  * sessions: the agent gets their names and descriptions, and reads one
  * with the `read_skill` tool when a task calls for it.
@@ -16,8 +16,8 @@
  */
 
 import { createHash } from "node:crypto";
-
-import cacache from "cacache";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import type { GrantStore } from "./grants.js";
 import { homePath } from "./home.js";
@@ -61,10 +61,10 @@ export function parseSkillRefs(input: unknown): string[] | undefined {
 
 export const sameRefs = (a: string[] | undefined, b: string[] | undefined) => (a ?? []).join("\n") === (b ?? []).join("\n");
 
-export interface SkillServiceOptions {
+interface SkillServiceOptions {
 	grants: GrantStore;
 	logger: Logger;
-	/** cacache folder; `null` keeps skills in memory (tests). */
+	/** Cache folder; `null` keeps skills in memory (tests). */
 	cache?: string | null;
 	/** Fetches a ref's skills; tests replace it. */
 	fetch?: (ref: string, origin: string) => Promise<{ skills: SkillContent[]; source: string; shared: boolean }>;
@@ -135,13 +135,15 @@ export class SkillService {
 
 	private async put(skill: SkillContent): Promise<string> {
 		const data = JSON.stringify(skill);
+		const integrity = integrityOf(data);
 		if (this.cache === null) {
-			const integrity = `sha256-${createHash("sha256").update(data).digest("base64")}`;
 			this.memory.set(integrity, skill);
-			return integrity;
+		} else {
+			const file = this.fileOf(integrity);
+			await mkdir(dirname(file), { recursive: true });
+			await writeFile(file, data);
 		}
-		// An `Integrity` object: kept as its string in grants.json.
-		return String(await cacache.put(this.cache, `skill:${skill.name}`, data, { algorithms: ["sha256"] }));
+		return integrity;
 	}
 
 	private async get(integrity: string): Promise<SkillContent> {
@@ -150,10 +152,21 @@ export class SkillService {
 			if (!skill) throw new Error("not cached");
 			return skill;
 		}
-		// Checks the content against its address.
-		return JSON.parse((await cacache.get.byDigest(this.cache, integrity)).toString("utf-8")) as SkillContent;
+		const data = await readFile(this.fileOf(integrity));
+		// Check the content against its address.
+		if (integrityOf(data) !== integrity) throw new Error("cached skill changed");
+		return JSON.parse(data.toString("utf-8")) as SkillContent;
+	}
+
+	/** Where a skill lives: cacache's content layout, so skills cached by earlier versions still resolve. */
+	private fileOf(integrity: string): string {
+		const hex = Buffer.from(integrity.replace(/^sha256-/, ""), "base64").toString("hex");
+		return join(this.cache!, "content-v2", "sha256", hex.slice(0, 2), hex.slice(2, 4), hex.slice(4));
 	}
 }
+
+/** A content address, in the `sha256-<base64>` form grants.json keeps. */
+const integrityOf = (data: string | Buffer) => `sha256-${createHash("sha256").update(data).digest("base64")}`;
 
 async function fetchRef(ref: string, origin: string) {
 	const source = parseSkillSource(ref, origin);

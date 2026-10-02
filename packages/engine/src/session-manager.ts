@@ -35,7 +35,7 @@ import { removeScratch } from "./scratch.js";
 import { type SkillContent, skillsPrompt } from "./skills.js";
 import type { WebMcpServer } from "./webmcp-server.js";
 
-export type SessionStatus =
+type SessionStatus =
 	| "pending_approval"
 	| "running"
 	| "idle"
@@ -43,7 +43,7 @@ export type SessionStatus =
 	| "failed"
 	| "cancelled";
 
-export interface PrepareParams {
+interface PrepareParams {
 	/** First turn. Without it, `approve` only starts the agent. */
 	prompt?: string;
 	attachments?: PromptAttachment[];
@@ -53,20 +53,19 @@ export interface PrepareParams {
 	origin: string;
 }
 
-export interface SessionInfo {
+interface SessionInfo {
 	id: string;
 	status: SessionStatus;
 	origin: string;
 	createdAt: string;
 	error?: string;
 	registrationToken: string;
-	webmcpUrl: string;
 }
 
-export type SessionListener = (event: string, data: unknown) => void;
+type SessionListener = (event: string, data: unknown) => void;
 
 /** What an agent profile needs to set up one session. */
-export interface SessionSetup {
+interface SessionSetup {
 	/** The session's empty sandbox directory (also the agent's cwd). */
 	sandbox: string;
 	/** MCP endpoint and bearer token for the page tools. */
@@ -153,8 +152,8 @@ export interface SessionManagerOptions {
 }
 
 /** Live (non-terminal) sessions one origin may hold at once. */
-export const MAX_SESSIONS_PER_ORIGIN = 4;
-export const MAX_TURNS_LIMIT = 50;
+const MAX_SESSIONS_PER_ORIGIN = 4;
+const MAX_TURNS_LIMIT = 50;
 /** How long an ended session stays readable. */
 const FORGET_AFTER_MS = 5 * 60_000;
 
@@ -263,15 +262,9 @@ export class SessionManager {
 		return this.sessions.get(sessionId)?.turnChunks ?? [];
 	}
 
-	webmcpReady(session: Session | string): {
-		registrationToken: string;
-		webmcpUrl: string;
-	} {
+	webmcpReady(session: Session | string): { registrationToken: string } {
 		const s = typeof session === "string" ? this.require(session) : session;
-		return {
-			registrationToken: s.registrationToken,
-			webmcpUrl: `http://127.0.0.1:${this.options.port}`,
-		};
+		return { registrationToken: s.registrationToken };
 	}
 
 	addListener(sessionId: string, listener: SessionListener): void {
@@ -282,17 +275,10 @@ export class SessionManager {
 		this.sessions.get(sessionId)?.listeners.delete(listener);
 	}
 
-	/** End every session of an origin, e.g. when its grant is revoked. */
-	/** End the sessions of the origins that match (their AI or model changed): the next message starts a new one. */
+	/** End the sessions of the origins that match (revoked, or their AI or model changed): the next message starts a new one. */
 	closeWhere(match: (origin: string) => boolean): void {
 		for (const session of this.sessions.values()) {
 			if (match(session.params.origin)) this.cancel(session.id);
-		}
-	}
-
-	closeOrigin(origin: string): void {
-		for (const session of this.sessions.values()) {
-			if (session.params.origin === origin) this.cancel(session.id);
 		}
 	}
 

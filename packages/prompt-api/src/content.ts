@@ -4,8 +4,7 @@
  * the exceptions Chrome throws.
  */
 
-import { type Message, type MessagePart, messageFiles, messageText, newId } from "@leuria/client";
-import { domError } from "./errors.js";
+import { dataUrl, type Message, type MessagePart, messageFiles, messageText, newId } from "@leuria/client";
 
 export type LanguageModelMessageRole = "system" | "user" | "assistant";
 export type LanguageModelMessageType = "text" | "image" | "audio" | "tool-call" | "tool-response";
@@ -43,14 +42,14 @@ export async function convert(input: LanguageModelPrompt, initial = false): Prom
 	let prefix: string | undefined;
 	for (const [index, message] of input.entries()) {
 		if (message.role === "system") {
-			if (!initial) throw domError("NotSupportedError", "System messages can only be given in initialPrompts.");
+			if (!initial) throw new DOMException("System messages can only be given in initialPrompts.", "NotSupportedError");
 			if (index !== 0) throw new TypeError("A system message must come first in initialPrompts.");
 		} else if (message.role !== "user" && message.role !== "assistant") {
 			throw new TypeError(`Unknown role: ${String(message.role)}`);
 		}
 		if (message.prefix) {
 			if (message.role !== "assistant" || index !== input.length - 1 || initial) {
-				throw domError("SyntaxError", "Only the last message, from the assistant, can be a prefix.");
+				throw new DOMException("Only the last message, from the assistant, can be a prefix.", "SyntaxError");
 			}
 		}
 		const parts = await toParts(message.content);
@@ -87,7 +86,7 @@ async function toParts(content: LanguageModelMessage["content"]): Promise<Messag
 				parts.push({ type: "file", ...(await imageData(item.value)) });
 				break;
 			case "audio":
-				throw domError("NotSupportedError", "Audio input is not supported.");
+				throw new DOMException("Audio input is not supported.", "NotSupportedError");
 			case "tool-call":
 			case "tool-response":
 				parts.push({ type: "text", text: `[${item.type}] ${typeof item.value === "string" ? item.value : JSON.stringify(item.value)}` });
@@ -126,10 +125,8 @@ async function imageData(value: unknown): Promise<{ mediaType: string; url: stri
 }
 
 function encode(bytes: Uint8Array, mediaType: string): { mediaType: string; url: string } {
-	if (!mediaType.startsWith("image/")) throw domError("NotSupportedError", "This image format is not supported.");
-	let binary = "";
-	for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-	return { mediaType, url: `data:${mediaType};base64,${btoa(binary)}` };
+	if (!mediaType.startsWith("image/")) throw new DOMException("This image format is not supported.", "NotSupportedError");
+	return { mediaType, url: dataUrl(bytes, mediaType) };
 }
 
 function sniff(bytes: Uint8Array): string {
@@ -148,24 +145,11 @@ async function drawToPng(source: object): Promise<Uint8Array> {
 	const size = source as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number; videoWidth?: number; videoHeight?: number; displayWidth?: number; displayHeight?: number };
 	const width = size.naturalWidth || size.videoWidth || size.displayWidth || size.width || 0;
 	const height = size.naturalHeight || size.videoHeight || size.displayHeight || size.height || 0;
-	if (!width || !height) throw domError("InvalidStateError", "The image has no size (not loaded yet?).");
-	let blob: Blob;
-	if (typeof OffscreenCanvas !== "undefined") {
-		const canvas = new OffscreenCanvas(width, height);
-		const ctx = canvas.getContext("2d")!;
-		if (isData) ctx.putImageData(source as ImageData, 0, 0);
-		else ctx.drawImage(source as CanvasImageSource, 0, 0);
-		blob = await canvas.convertToBlob({ type: "image/png" });
-	} else if (typeof document !== "undefined") {
-		const canvas = document.createElement("canvas");
-		canvas.width = width;
-		canvas.height = height;
-		const ctx = canvas.getContext("2d")!;
-		if (isData) ctx.putImageData(source as ImageData, 0, 0);
-		else ctx.drawImage(source as CanvasImageSource, 0, 0);
-		blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(domError("InvalidStateError", "The image could not be read."))), "image/png"));
-	} else {
-		throw domError("NotSupportedError", "Images need a browser.");
-	}
+	if (!width || !height) throw new DOMException("The image has no size (not loaded yet?).", "InvalidStateError");
+	const canvas = new OffscreenCanvas(width, height);
+	const ctx = canvas.getContext("2d")!;
+	if (isData) ctx.putImageData(source as ImageData, 0, 0);
+	else ctx.drawImage(source as CanvasImageSource, 0, 0);
+	const blob = await canvas.convertToBlob({ type: "image/png" });
 	return new Uint8Array(await blob.arrayBuffer());
 }

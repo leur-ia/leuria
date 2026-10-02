@@ -26,20 +26,13 @@ export function setDefaultAppearance(value: "light" | "dark" | undefined): void 
 const sheets = new Map<string, CSSStyleSheet>();
 
 function adoptStyles(root: ShadowRoot, extra: string): void {
-	const css = `${tokens}\n${styles}\n${extra}`;
-	if ("adoptedStyleSheets" in root && typeof CSSStyleSheet !== "undefined" && "replaceSync" in CSSStyleSheet.prototype) {
-		let sheet = sheets.get(extra);
-		if (!sheet) {
-			sheet = new CSSStyleSheet();
-			sheet.replaceSync(css);
-			sheets.set(extra, sheet);
-		}
-		root.adoptedStyleSheets = [sheet];
-	} else {
-		const style = document.createElement("style");
-		style.textContent = css;
-		root.append(style);
+	let sheet = sheets.get(extra);
+	if (!sheet) {
+		sheet = new CSSStyleSheet();
+		sheet.replaceSync(`${tokens}\n${styles}\n${extra}`);
+		sheets.set(extra, sheet);
 	}
+	root.adoptedStyleSheets = [sheet];
 }
 
 /**

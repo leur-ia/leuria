@@ -104,7 +104,7 @@ export class PageEmbedder extends BaseProvider {
 		const texts = kind === "query" && this.queryPrefix ? input.map((t) => this.queryPrefix + t) : input;
 		const vectors: number[][] = [];
 		for (let i = 0; i < texts.length; i += BATCH) {
-			if (signal?.aborted) throw signal.reason ?? new Error("Aborted");
+			signal?.throwIfAborted();
 			vectors.push(...((await worker.call({ type: "embed", texts: texts.slice(i, i + BATCH) })) ?? []));
 		}
 		return { vectors, model: this.model };

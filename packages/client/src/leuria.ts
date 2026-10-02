@@ -231,6 +231,15 @@ export class Leuria {
 	 * Chat providers that wait for the visitor's pick: those after the first
 	 * `asksFirst` provider while it isn't ready.
 	 */
+	/** The providers named in `provider`, in that order, else every provider offering `serves`. */
+	private candidates(serves: Service, provider: string | string[] | undefined): Provider[] {
+		if (provider === undefined) return this.providers.filter((p) => offersOf(p).includes(serves));
+		return [provider]
+			.flat()
+			.map((id) => this.providers.find((p) => p.id === id))
+			.filter((p): p is Provider => Boolean(p));
+	}
+
 	private waiting(): Set<string> {
 		const waiting = new Set<string>();
 		if (this.fallback === "auto") return waiting;
@@ -281,10 +290,7 @@ export class Leuria {
 	 * different models can't be compared: keep `model` with them.
 	 */
 	async embed(texts: string[], options: EmbedOptions = {}): Promise<EmbedResponse> {
-		const allowed = options.provider === undefined ? undefined : [options.provider].flat();
-		const candidates = allowed
-			? allowed.map((id) => this.providers.find((p) => p.id === id)).filter((p): p is Provider => Boolean(p))
-			: this.providers.filter((p) => offersOf(p).includes("embed"));
+		const candidates = this.candidates("embed", options.provider);
 		const reasons: NoProviderError["reasons"] = [];
 		for (const provider of candidates) {
 			const state = provider.getState();
@@ -319,14 +325,11 @@ export class Leuria {
 		const needs: Capability[] = ["chat"];
 		if (requirements.tools) needs.push("tools");
 		if (requirements.images) needs.push("images");
-		const allowed = routing.provider === undefined ? undefined : [routing.provider].flat();
-		const candidates = allowed
-			? allowed.map((id) => this.providers.find((p) => p.id === id)).filter((p): p is Provider => Boolean(p))
-			: this.providers.filter((p) => offersOf(p).includes("chat"));
+		const candidates = this.candidates("chat", routing.provider);
 
 		const reasons: NoProviderError["reasons"] = [];
 		// Only the cascade waits for the visitor's pick: a provider named in `routing.provider` is the site's own choice.
-		const waiting = allowed ? new Set<string>() : this.waiting();
+		const waiting = routing.provider === undefined ? this.waiting() : new Set<string>();
 		const choices: string[] = [];
 		for (const provider of candidates) {
 			const state = provider.getState();

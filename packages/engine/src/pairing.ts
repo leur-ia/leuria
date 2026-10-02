@@ -58,7 +58,7 @@ interface PendingRequest {
 	waiters: Set<() => void>;
 }
 
-export interface PairingOptions {
+interface PairingOptions {
 	grants: GrantStore;
 	logger: Logger;
 	/** Engine's own origins, e.g. `http://127.0.0.1:19570`. */

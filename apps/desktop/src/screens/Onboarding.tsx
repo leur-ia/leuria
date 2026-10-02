@@ -154,7 +154,7 @@ export function Onboarding() {
 									</Text>
 									{models && models.options.length > 1 && (
 										<Disclosure label="Model" value={models.options.find((m) => m.id === models.current)?.name}>
-											<AgentModelSelect models={models} showLabel={false} onChange={(id) => void onboardingStore.setModel(step.agent.id, id)} />
+											<AgentModelSelect models={models} onChange={(id) => void onboardingStore.setModel(step.agent.id, id)} />
 										</Disclosure>
 									)}
 									<InkButton onClick={finish}>Finish</InkButton>
@@ -373,22 +373,22 @@ function Choose({
 						<Text size="2" color="green">
 							{[...new Set(localModels.map((m) => m.provider?.name))].join(" and ")} found · private and free
 						</Text>
-						<ModelPicker label="Model" models={localModels} value={localModel} onChange={(id) => void onboardingStore.selectModel("local", id)} />
+						<ModelPicker models={localModels} value={localModel} onChange={(id) => void onboardingStore.selectModel("local", id)} />
 					</Flex>
 				)}
 				{!onlyLocal && selected === "local" && localModels.length > 0 && (
 					<Disclosure label="Model" value={localModels.find((m) => m.id === localModel)?.model}>
-						<ModelPicker label="Model" models={localModels} value={localModel} onChange={(id) => void onboardingStore.selectModel("local", id)} />
+						<ModelPicker models={localModels} value={localModel} onChange={(id) => void onboardingStore.selectModel("local", id)} />
 					</Disclosure>
 				)}
 				{selected === "api" && (
 					<Flex direction="column" gap="3">
 						{apiModels.length > 0 &&
 							(onlyService ? (
-								<ModelPicker label="Model" models={apiModels} value={apiModel} onChange={(id) => void onboardingStore.selectModel("api", id)} />
+								<ModelPicker models={apiModels} value={apiModel} onChange={(id) => void onboardingStore.selectModel("api", id)} />
 							) : (
 								<Disclosure label="Model" value={apiModels.find((m) => m.id === apiModel)?.model}>
-									<ModelPicker label="Model" models={apiModels} value={apiModel} onChange={(id) => void onboardingStore.selectModel("api", id)} />
+									<ModelPicker models={apiModels} value={apiModel} onChange={(id) => void onboardingStore.selectModel("api", id)} />
 								</Disclosure>
 							))}
 						{apiModels.length > 0 && !apiFormOpen ? (
@@ -496,12 +496,10 @@ function Choose({
 }
 
 function ModelPicker({
-	label,
 	models,
 	value,
 	onChange,
 }: {
-	label: string;
 	models: AgentChoice[];
 	value: string | null;
 	onChange: (id: string) => void;
@@ -509,7 +507,7 @@ function ModelPicker({
 	return (
 		<Flex direction="column" gap="1">
 			<Select.Root value={value ?? undefined} onValueChange={onChange}>
-				<Select.Trigger aria-label={label} />
+				<Select.Trigger aria-label="Model" />
 				<Select.Content position="popper">
 					{models.map((m) => (
 						<Select.Item key={m.id} value={m.id}>

@@ -27,6 +27,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer } from "ws";
 
+import { parseBody } from "./http-utils.js";
+import type { Logger } from "./logger.js";
 import { READ_SKILL, readSkill, readSkillTool, type SkillContent } from "./skills.js";
 
 // ---------------------------------------------------------------------------
@@ -40,32 +42,17 @@ export interface ToolDescriptor {
 	annotations?: Record<string, unknown>;
 }
 
-export interface ResourceDescriptor {
+interface ResourceDescriptor {
 	uri: string;
 	name: string;
 	description?: string;
 	mimeType?: string;
 }
 
-export interface PromptDescriptor {
+interface PromptDescriptor {
 	name: string;
 	description?: string;
 	arguments?: Array<{ name: string; description?: string; required?: boolean }>;
-}
-
-export interface WebMcpChannelSummary {
-	id: string;
-	sessionId: string;
-	connected: boolean;
-	tools: Array<{ name: string; description?: string }>;
-	resources: Array<{ uri: string; name: string; description?: string }>;
-	prompts: Array<{ name: string; description?: string }>;
-}
-
-export interface WebMcpLogger {
-	info: (msg: string, meta?: Record<string, unknown>) => void;
-	warn: (msg: string, meta?: Record<string, unknown>) => void;
-	error: (msg: string, meta?: Record<string, unknown>) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +130,7 @@ export class WebMcpServer {
 	private readonly channelWss: WebSocketServer;
 
 	constructor(
-		private readonly logger: WebMcpLogger,
+		private readonly logger: Logger,
 		private readonly port: number,
 	) {
 		this.registerWss = new WebSocketServer({ noServer: true });
@@ -200,64 +187,14 @@ export class WebMcpServer {
 		return { registrationToken, channelToken, channelId };
 	}
 
-	getChannelSummaries(): WebMcpChannelSummary[] {
-		return Array.from(this.channels.values()).map((ch) => ({
-			id: ch.id,
-			sessionId: ch.sessionId,
-			connected:
-				ch.browserWs !== null && ch.browserWs.readyState === WebSocket.OPEN,
-			tools: Array.from(ch.tools.values()).map((t) => ({
-				name: t.name,
-				description: t.description,
-			})),
-			resources: Array.from(ch.resources.values()).map((r) => ({
-				uri: r.uri,
-				name: r.name,
-				description: r.description,
-			})),
-			prompts: Array.from(ch.prompts.values()).map((p) => ({
-				name: p.name,
-				description: p.description,
-			})),
-		}));
-	}
-
 	/**
-	 * Tear everything down — close the two WebSocketServers, kill every
-	 * ping timer, reject every pending request, force-close every browser
-	 * channel WS. Called from `daemon.ts`'s `shutdown` so the process can
-	 * exit on Ctrl-C; without it the WS servers keep the event loop alive
-	 * indefinitely.
+	 * Tear everything down — remove every channel (ping timers, pending
+	 * requests, browser WS), then close the two WebSocketServers. Called on
+	 * shutdown so the process can exit on Ctrl-C; without it the WS servers
+	 * keep the event loop alive indefinitely.
 	 */
 	close(): void {
-		for (const channel of this.channels.values()) {
-			if (channel.pingTimer) {
-				clearInterval(channel.pingTimer);
-				channel.pingTimer = null;
-			}
-			for (const [, pending] of channel.pendingRequests) {
-				clearTimeout(pending.timeout);
-				try {
-					pending.reject(new Error("WebMCP server shutting down"));
-				} catch {
-					// resolver already settled
-				}
-			}
-			channel.pendingRequests.clear();
-			if (channel.browserWs) {
-				try {
-					channel.browserWs.terminate();
-				} catch {
-					// already closed
-				}
-				channel.browserWs = null;
-			}
-		}
-		this.channels.clear();
-		this.tokenToChannel.clear();
-		this.sessionChannels.clear();
-		this.registrationTokens.clear();
-
+		for (const sessionId of [...this.sessionChannels.keys()]) this.removeChannel(sessionId);
 		try {
 			this.registerWss.close();
 		} catch {
@@ -416,7 +353,7 @@ export class WebMcpServer {
 
 		let body: JsonRpcRequest;
 		try {
-			body = (await this.parseBody(req)) as JsonRpcRequest;
+			body = (await parseBody(req)) as JsonRpcRequest;
 		} catch {
 			this.sendJsonRpcError(res, null, -32700, "Parse error", 400);
 			return;
@@ -489,18 +426,10 @@ export class WebMcpServer {
 				res.end(JSON.stringify(payload));
 			} catch (err) {
 				clearInterval(keepAlive);
-				const message = err instanceof Error ? err.message : String(err);
-				const unsupported = message.startsWith("Unsupported method");
-				const code = unsupported ? -32601 : message.includes("not connected") ? -32001 : -32603;
-				this.logger[unsupported ? "info" : "warn"]("WebMCP MCP error", {
-					channelId,
-					method: body.method,
-					message,
-				});
 				const payload: JsonRpcResponse = {
 					jsonrpc: "2.0",
 					id: body.id ?? null,
-					error: { code, message },
+					error: this.rpcError(channelId, body.method, err),
 				};
 				res.end(JSON.stringify(payload));
 			}
@@ -511,17 +440,19 @@ export class WebMcpServer {
 			const result = await this.dispatch(channel, body);
 			this.sendJsonRpcResult(res, body.id ?? null, result);
 		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			const unsupported = message.startsWith("Unsupported method");
-			const code = unsupported ? -32601 : message.includes("not connected") ? -32001 : -32603;
-			// Newer MCP clients probe optional methods; that is not an error.
-			this.logger[unsupported ? "info" : "warn"]("WebMCP MCP error", {
-				channelId,
-				method: body.method,
-				message,
-			});
+			const { code, message } = this.rpcError(channelId, body.method, err);
 			this.sendJsonRpcError(res, body.id ?? null, code, message, 500);
 		}
+	}
+
+	/** Map a dispatch failure to a JSON-RPC error, and log it. */
+	private rpcError(channelId: string, method: string, err: unknown): { code: number; message: string } {
+		const message = err instanceof Error ? err.message : String(err);
+		const unsupported = message.startsWith("Unsupported method");
+		const code = unsupported ? -32601 : message.includes("not connected") ? -32001 : -32603;
+		// Newer MCP clients probe optional methods; that is not an error.
+		this.logger[unsupported ? "info" : "warn"]("WebMCP MCP error", { channelId, method, message });
+		return { code, message };
 	}
 
 	// ── Browser registration WS ─────────────────────────────────────────
@@ -955,22 +886,6 @@ export class WebMcpServer {
 	}
 
 	// ── HTTP helpers ────────────────────────────────────────────────────
-
-	private parseBody(req: IncomingMessage): Promise<unknown> {
-		return new Promise((resolve, reject) => {
-			const chunks: Buffer[] = [];
-			req.on("data", (chunk: Buffer) => chunks.push(chunk));
-			req.on("end", () => {
-				try {
-					const raw = Buffer.concat(chunks).toString("utf-8");
-					resolve(raw ? JSON.parse(raw) : {});
-				} catch {
-					reject(new Error("Invalid JSON body"));
-				}
-			});
-			req.on("error", reject);
-		});
-	}
 
 	private sendJsonRpcResult(
 		res: ServerResponse,

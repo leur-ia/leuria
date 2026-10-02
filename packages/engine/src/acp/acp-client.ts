@@ -48,7 +48,7 @@ export type PromptAttachment =
 	| { type: "image"; mimeType: string; data: string; name?: string }
 	| { type: "text"; text: string; name?: string; mimeType?: string };
 
-export interface AcpLiveSessionOptions {
+interface AcpLiveSessionOptions {
 	command: string;
 	args: string[];
 	cwd: string;

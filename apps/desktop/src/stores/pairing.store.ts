@@ -35,16 +35,10 @@ export const pairingStore = createStore(initial, {
 		]);
 		return pairingStore.getState().requestId === requestId ? { ais, models, fit } : {};
 	},
-	/** Take a recommendation: its AI (null: the default) and model. */
+	/** Choose an AI (null: the default) and model (null: the AI's own), e.g. a recommendation; its models load anew. */
 	pick: async (_state, agent: string | null, model: string | null): Promise<Partial<PairingChoiceState>> => {
 		const token = ++picking;
-		pairingStore.updateState({ agent, model });
-		const models = await engine.models(agent ?? undefined).catch(() => null);
-		return token === picking ? { models } : {};
-	},
-	pickAgent: async (_state, agent: string | null): Promise<Partial<PairingChoiceState>> => {
-		const token = ++picking;
-		pairingStore.updateState({ agent, model: null, models: null });
+		pairingStore.updateState({ agent, model, models: null });
 		const models = await engine.models(agent ?? undefined).catch(() => null);
 		return token === picking ? { models } : {};
 	},

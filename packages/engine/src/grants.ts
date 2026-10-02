@@ -11,7 +11,7 @@ import { homePath, readJson, writeJson } from "./home.js";
 import type { SiteNeeds } from "./needs.js";
 import type { SiteSkills } from "./skills.js";
 
-export interface Grant {
+interface Grant {
 	origin: string;
 	/** Name the site gave when it asked to connect. */
 	app?: string;
@@ -71,36 +71,40 @@ export class GrantStore {
 
 	/** Use `agent` for this site, or the default AI when `undefined`. */
 	setAgent(origin: string, agent: string | undefined): boolean {
-		this.reload();
-		const grant = this.grants.find((g) => g.origin === normalizeOrigin(origin));
-		if (!grant) return false;
-		if (agent) grant.agent = agent;
-		else delete grant.agent;
-		this.save();
-		for (const listener of this.changedListeners) listener(grant.origin);
-		return true;
+		return this.update(origin, (g) => {
+			if (agent) g.agent = agent;
+			else delete g.agent;
+		});
 	}
 
 	/** Use `model` of `agent` for this site, or that AI's own choice when `undefined`. */
 	setModel(origin: string, model: { agent: string; id: string } | undefined): boolean {
-		this.reload();
-		const grant = this.grants.find((g) => g.origin === normalizeOrigin(origin));
-		if (!grant) return false;
-		if (model) grant.model = model;
-		else delete grant.model;
-		this.save();
-		for (const listener of this.changedListeners) listener(grant.origin);
-		return true;
+		return this.update(origin, (g) => {
+			if (model) g.model = model;
+			else delete g.model;
+		});
 	}
 
 	/** Replace the site's skills (it changed its list). Its open conversations keep the skills they started with. */
 	setSkills(origin: string, skills: SiteSkills | undefined): boolean {
+		return this.update(
+			origin,
+			(g) => {
+				if (skills) g.skills = skills;
+				else delete g.skills;
+			},
+			false,
+		);
+	}
+
+	/** Change the origin's grant and save it; `notify` tells the change listeners. False when there is none. */
+	private update(origin: string, mutate: (grant: Grant) => void, notify = true): boolean {
 		this.reload();
 		const grant = this.grants.find((g) => g.origin === normalizeOrigin(origin));
 		if (!grant) return false;
-		if (skills) grant.skills = skills;
-		else delete grant.skills;
+		mutate(grant);
 		this.save();
+		if (notify) for (const listener of this.changedListeners) listener(grant.origin);
 		return true;
 	}
 

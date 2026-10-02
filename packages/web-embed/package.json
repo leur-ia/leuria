@@ -19,7 +19,7 @@
   "files": ["dist"],
   "sideEffects": false,
   "scripts": {
-    "build": "tsup && cp src/worker.js dist/worker.js",
+    "build": "tsup && cp src/worker.js src/listen.js dist/",
     "check": "tsc --noEmit"
   },
   "dependencies": {

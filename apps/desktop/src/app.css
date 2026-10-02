@@ -42,7 +42,9 @@ body { margin: 0; background: var(--bg); -webkit-user-select: none; user-select:
 .start-content { flex: 1; }
 .start-card { width: 100%; max-width: 420px; }
 .disclosure-chevron { display: inline-flex; transform: rotate(-90deg); transition: transform var(--timing-fast) var(--easing-standard); }
-.disclosure-chevron.open { transform: none; }
+.disclosure > summary { list-style: none; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure[open] .disclosure-chevron { transform: none; }
 .text-link { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; color: inherit; }
 .ai-row { display: flex; flex-direction: column; gap: var(--space-2); padding-block: var(--space-3); border-top: 1px solid var(--border); }
 .ai-row:first-child { border-top: none; padding-top: 0; }

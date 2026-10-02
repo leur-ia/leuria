@@ -15,37 +15,35 @@ export interface ElementProps {
 
 /**
  * Render a Leuria element with the client from `LeuriaProvider`, plain
- * attributes and event listeners, through refs: the same in React 18 and 19.
+ * attributes, the status's `labels` and the button's `leuria-disconnect`
+ * listener, through refs: the same in React 18 and 19.
  */
-export function useLeuriaElement<E extends HTMLElement & { client?: Leuria }>(
+export function useLeuriaElement(
 	tag: string,
 	attributes: Record<string, string | boolean | number | undefined>,
 	{ appearance, className, style, children }: ElementProps & { children?: ReactNode },
-	events: Record<string, (() => void) | undefined> = {},
-	properties: Record<string, unknown> = {},
+	extras: { onDisconnect?: () => void; labels?: Record<string, string> } = {},
 ): ReactElement {
 	const client = useLeuria();
-	const ref = useRef<E>(null);
+	const ref = useRef<HTMLElement & { client?: Leuria; labels?: Record<string, string> }>(null);
 
 	useIsomorphicLayoutEffect(() => {
 		const element = ref.current;
 		if (!element) return;
 		element.client = client;
-		for (const [name, value] of Object.entries(properties)) (element as unknown as Record<string, unknown>)[name] = value;
+		if ("labels" in extras) element.labels = extras.labels;
 	});
 
-	const handlers = useRef(events);
-	handlers.current = events;
-	const names = Object.keys(events).join(" ");
+	const onDisconnect = useRef(extras.onDisconnect);
+	onDisconnect.current = extras.onDisconnect;
+	const listens = Boolean(extras.onDisconnect);
 	useEffect(() => {
 		const element = ref.current;
-		if (!element || !names) return;
-		const listeners = names.split(" ").map((name) => [name, () => handlers.current[name]?.()] as const);
-		for (const [name, listener] of listeners) element.addEventListener(name, listener);
-		return () => {
-			for (const [name, listener] of listeners) element.removeEventListener(name, listener);
-		};
-	}, [names]);
+		if (!element || !listens) return;
+		const listener = () => onDisconnect.current?.();
+		element.addEventListener("leuria-disconnect", listener);
+		return () => element.removeEventListener("leuria-disconnect", listener);
+	}, [listens]);
 
 	const attrs: Record<string, string> = {};
 	const all: Record<string, string | boolean | number | undefined> = { ...attributes, appearance };

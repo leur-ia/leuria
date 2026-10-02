@@ -85,8 +85,8 @@ describe("admin API", () => {
 		expect(linked.status).toBe(201);
 		const started = (await linked.json()) as { requestId: string };
 		expect(events.at(-1)).toMatchObject({ event: "pairing", requestId: started.requestId, origin: site, app: "Shop" });
-		const pending = (await (await admin("/pairing")).json()) as { requests: Array<{ requestId: string }> };
-		expect(pending.requests.map((r) => r.requestId)).toEqual([started.requestId]);
+		const pending = (await (await admin("/status")).json()) as { pairing: Array<{ requestId: string }> };
+		expect(pending.pairing.map((r) => r.requestId)).toEqual([started.requestId]);
 
 		expect((await admin(`/pairing/${started.requestId}`, { method: "POST", body: '{"allow":true}' })).status).toBe(200);
 		expect(events.at(-1)).toMatchObject({ event: "pairing_decided", allowed: true });

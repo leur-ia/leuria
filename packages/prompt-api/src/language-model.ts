@@ -28,7 +28,6 @@ import {
 } from "@leuria/client";
 import { checkAnswer, constraintInstruction, type ResponseConstraint } from "./constraint.js";
 import { asOneTurn, convert, type LanguageModelMessage, type LanguageModelMessageType, type LanguageModelPrompt } from "./content.js";
-import { abortReason, domError } from "./errors.js";
 
 export type Availability = "unavailable" | "downloadable" | "downloading" | "available";
 
@@ -148,25 +147,25 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 		static async create(options: LanguageModelCreateOptions = {}): Promise<LanguageModel> {
 			validateCore(options);
 			const { signal } = options;
-			if (signal?.aborted) throw abortReason(signal);
+			signal?.throwIfAborted();
 			const initial = await convert(options.initialPrompts ?? [], true);
 			const ai = provider();
 			let availability = await availabilityOf(ai, options);
-			if (availability === "unavailable") throw domError("NotSupportedError", "No AI can serve these options here.");
+			if (availability === "unavailable") throw new DOMException("No AI can serve these options here.", "NotSupportedError");
 			const monitor = new EventTarget();
 			options.monitor?.(monitor);
 			if (availability !== "available") {
 				if (!hasActivation()) {
-					throw domError("NotAllowedError", "Connecting the visitor's AI needs a user gesture: call create() from a click.");
+					throw new DOMException("Connecting the visitor's AI needs a user gesture: call create() from a click.", "NotAllowedError");
 				}
-				if (!ai.connect) throw domError("NotSupportedError", "This AI cannot be connected from the page.");
+				if (!ai.connect) throw new DOMException("This AI cannot be connected from the page.", "NotSupportedError");
 				progress(monitor, 0);
 				await untilAborted(ai.connect(), signal);
 				availability = await availabilityOf(ai, options);
-				if (availability !== "available") throw domError("NotAllowedError", "The visitor's AI was not connected.");
+				if (availability !== "available") throw new DOMException("The visitor's AI was not connected.", "NotAllowedError");
 				progress(monitor, 1);
 			}
-			if (signal?.aborted) throw abortReason(signal);
+			signal?.throwIfAborted();
 			const { signal: _signal, monitor: _monitor, initialPrompts: _initial, ...core } = options;
 			return new LanguageModel(key, { options: core, system: initial.system || defaultSystem, history: initial.messages });
 		}
@@ -242,7 +241,7 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 						},
 					);
 				},
-				cancel: (reason) => cancel.abort(reason ?? domError("AbortError", "The stream was cancelled.")),
+				cancel: (reason) => cancel.abort(reason ?? new DOMException("The stream was cancelled.", "AbortError")),
 			});
 			return asyncIterable(stream);
 		}
@@ -250,11 +249,11 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 		async append(input: LanguageModelPrompt, options: LanguageModelAppendOptions = {}): Promise<void> {
 			this.#assertLive();
 			const signal = anySignal(options.signal, this.#lifetime.signal);
-			if (signal.aborted) throw abortReason(signal);
+			signal.throwIfAborted();
 			const { messages, prefix } = await convert(input);
-			if (prefix !== undefined) throw domError("SyntaxError", "append() takes no prefix message.");
+			if (prefix !== undefined) throw new DOMException("append() takes no prefix message.", "SyntaxError");
 			const work = this.#queue.then(() => {
-				if (signal.aborted) throw abortReason(signal);
+				signal.throwIfAborted();
 				this.#pending.push(...messages);
 			});
 			this.#queue = work.catch(() => undefined);
@@ -279,7 +278,7 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 		destroy(): void {
 			if (this.#destroyed) return;
 			this.#destroyed = true;
-			this.#lifetime.abort(domError("AbortError", "The session was destroyed."));
+			this.#lifetime.abort(new DOMException("The session was destroyed.", "AbortError"));
 			this.#dropSession();
 			live.delete(this);
 		}
@@ -289,7 +288,7 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 		async #prompt(input: LanguageModelPrompt, options: LanguageModelPromptOptions, onDelta?: (delta: string) => void): Promise<string> {
 			this.#assertLive();
 			const signal = anySignal(options.signal, this.#lifetime.signal);
-			if (signal.aborted) throw abortReason(signal);
+			signal.throwIfAborted();
 			const constraint = options.responseConstraint;
 			if (constraint !== undefined && (typeof constraint !== "object" || constraint === null)) {
 				throw new TypeError("responseConstraint must be a JSON Schema or a RegExp.");
@@ -307,12 +306,12 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 			signal: AbortSignal,
 			onDelta?: (delta: string) => void,
 		): Promise<string> {
-			if (signal.aborted) throw abortReason(signal);
+			signal.throwIfAborted();
 			const sending = [...this.#pending, ...messages];
 			const user = asOneTurn(sending.length ? sending : [{ id: newId(), role: "user", parts: [{ type: "text", text: "" }] }]);
 			const hasImages = user.parts.some((p) => p.type === "file" && p.mediaType.startsWith("image/"));
 			if (hasImages && !provider().getState().capabilities.includes("images")) {
-				throw domError("NotSupportedError", "The visitor's AI does not take images.");
+				throw new DOMException("The visitor's AI does not take images.", "NotSupportedError");
 			}
 			const instructions = [
 				constraint ? constraintInstruction(constraint) : undefined,
@@ -329,7 +328,7 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 					text = await this.#send(session, { id: newId(), role: "user", parts: [{ type: "text", text: fix }] }, signal);
 					check = checkAnswer(stripPrefix(text, prefix), constraint);
 				}
-				if (!check.ok) throw domError("UnknownError", `The answer did not match the response constraint: ${check.error}.`);
+				if (!check.ok) throw new DOMException(`The answer did not match the response constraint: ${check.error}.`, "UnknownError");
 				answer = check.text;
 				if (answer) onDelta?.(answer);
 			} else {
@@ -357,10 +356,10 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 			try {
 				return (await session.send(message, context)).text;
 			} catch (error) {
-				if (signal.aborted) throw abortReason(signal);
+				signal.throwIfAborted();
 				// A broken session is not reused: the next prompt starts a new one, with the history.
 				this.#dropSession();
-				throw domError("UnknownError", error instanceof Error ? error.message : String(error));
+				throw new DOMException(error instanceof Error ? error.message : String(error), "UnknownError");
 			}
 		}
 
@@ -381,13 +380,13 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 			const ai = provider();
 			if (ai.getState().status !== "ready") await ai.detect().catch(() => undefined);
 			const state = ai.getState();
-			if (state.status !== "ready") throw domError("InvalidStateError", "The visitor's AI is not connected anymore.");
+			if (state.status !== "ready") throw new DOMException("The visitor's AI is not connected anymore.", "InvalidStateError");
 			const tools = [...this.#tools.values()].map(({ name, description, inputSchema }) => ({
 				name,
 				description,
 				inputSchema: inputSchema as Record<string, unknown>,
 			}));
-			if (tools.length && !state.capabilities.includes("tools")) throw domError("NotSupportedError", "The visitor's AI cannot use tools.");
+			if (tools.length && !state.capabilities.includes("tools")) throw new DOMException("The visitor's AI cannot use tools.", "NotSupportedError");
 			this.#session = await ai.createSession({ system: this.#system, tools, history: [...this.#history], maxSteps });
 			return this.#session;
 		}
@@ -402,7 +401,7 @@ export function createLanguageModel(options: PromptAPIOptions = {}) {
 		}
 
 		#assertLive(): void {
-			if (this.#destroyed) throw domError("InvalidStateError", "The session was destroyed.");
+			if (this.#destroyed) throw new DOMException("The session was destroyed.", "InvalidStateError");
 		}
 	}
 
@@ -493,26 +492,15 @@ function prefixStripper(prefix: string | undefined, onDelta?: (delta: string) =>
 }
 
 function anySignal(...signals: Array<AbortSignal | undefined>): AbortSignal {
-	const list = signals.filter((s): s is AbortSignal => Boolean(s));
-	if (list.length === 1) return list[0]!;
-	if (typeof AbortSignal.any === "function") return AbortSignal.any(list);
-	const controller = new AbortController();
-	for (const signal of list) {
-		if (signal.aborted) {
-			controller.abort(signal.reason);
-			break;
-		}
-		signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
-	}
-	return controller.signal;
+	return AbortSignal.any(signals.filter((s): s is AbortSignal => Boolean(s)));
 }
 
 /** `promise`, or the abort reason as soon as `signal` aborts (the work itself may settle later). */
 function untilAborted<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
 	if (!signal) return promise;
-	if (signal.aborted) return Promise.reject(abortReason(signal));
+	if (signal.aborted) return Promise.reject(signal.reason);
 	return new Promise<T>((resolve, reject) => {
-		const onAbort = () => reject(abortReason(signal));
+		const onAbort = () => reject(signal.reason);
 		signal.addEventListener("abort", onAbort, { once: true });
 		promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
 	});

@@ -14,7 +14,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const DEFAULT_PORT = 19570;
-export const DEFAULT_AGENT = "claude-acp";
+const DEFAULT_AGENT = "claude-acp";
 
 export interface EngineConfig {
 	port: number;
