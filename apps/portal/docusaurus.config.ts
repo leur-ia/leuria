@@ -87,7 +87,34 @@ const config: Config = {
 					editUrl: `${repoUrl}/edit/main/docs/`,
 					beforeDefaultRemarkPlugins: [[remarkRepoLinks, { repoDir, docsDir, repoUrl }]],
 				},
-				blog: false,
+				// Tutorials: one per tool (Ollama, LM Studio, LiteLLM…), relayed to dev.to
+				// from the RSS feed with this site as the canonical page.
+				blog: {
+					path: "tutorials",
+					routeBasePath: "tutorials",
+					blogTitle: "Leuria tutorials",
+					blogDescription:
+						"Step-by-step tutorials: add AI features to your website that run on each visitor's own AI, from Ollama, LM Studio, oMLX, ChatGPT or Claude, with LiteLLM or vLLM as your fallback. No API keys in the page.",
+					blogSidebarTitle: "All tutorials",
+					blogSidebarCount: "ALL",
+					postsPerPage: "ALL",
+					showReadingTime: true,
+					showLastUpdateTime: true,
+					authorsMapPath: "authors.yml",
+					tags: "tags.yml",
+					onInlineTags: "throw",
+					onInlineAuthors: "throw",
+					onUntruncatedBlogPosts: "throw",
+					editUrl: `${repoUrl}/edit/main/apps/portal/`,
+					feedOptions: {
+						type: ["rss", "atom", "json"],
+						title: "Leuria tutorials",
+						description: "Add AI to your website on each visitor's own AI: Ollama, LM Studio, oMLX, LiteLLM and more.",
+						copyright: "Leuria · Apache-2.0",
+						language: "en",
+						limit: false,
+					},
+				},
 				theme: { customCss: "./src/css/custom.css" },
 			} satisfies Preset.Options,
 		],
@@ -125,7 +152,10 @@ const config: Config = {
 				suggestions: ["How do I add Leuria to my site?", "How do page tools work?", "What happens when the visitor has no AI?"],
 			},
 		],
-		["docusaurus-plugin-llms", { docsDir: "../../docs", generateMarkdownFiles: true }],
+		[
+			"docusaurus-plugin-llms",
+			{ docsDir: "../../docs", generateMarkdownFiles: true, includeBlog: true, blogDir: "tutorials", blogRouteBasePath: "tutorials" },
+		],
 	],
 
 	themeConfig: {
@@ -141,6 +171,7 @@ const config: Config = {
 			items: [
 				{ type: "docSidebar", sidebarId: "docs", position: "left", label: "Docs" },
 				{ type: "docSidebar", sidebarId: "api", docsPluginId: "api", position: "left", label: "API" },
+				{ to: "/tutorials", label: "Tutorials", position: "left" },
 				{ to: "/tool-builder", label: "Tool builder", position: "left" },
 				{ href: demosUrl, label: "Demos", position: "left" },
 				{ href: `${repoUrl}`, label: "GitHub", position: "right" },
@@ -157,6 +188,8 @@ const config: Config = {
 						{ label: "API reference", to: "/api" },
 						{ label: "Engine protocol", to: "/docs/developers/protocol" },
 						{ label: "Ask AI for Docusaurus", to: "/docs/developers/docusaurus" },
+						{ label: "Tutorials", to: "/tutorials" },
+						{ label: "Tutorials feed (RSS)", href: "https://leuria.dev/tutorials/rss.xml" },
 					],
 				},
 				{

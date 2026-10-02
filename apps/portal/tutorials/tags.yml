@@ -1,0 +1,39 @@
+docusaurus:
+  label: Docusaurus
+  description: Add an AI assistant to a Docusaurus site.
+ollama:
+  label: Ollama
+  description: Use Ollama models on websites through Leuria.
+lm-studio:
+  label: LM Studio
+  description: Use LM Studio models on websites through Leuria.
+omlx:
+  label: oMLX
+  description: Use oMLX, the local model server for Apple Silicon, on websites.
+litellm:
+  label: LiteLLM
+  description: LiteLLM as your site's own fallback AI.
+vllm:
+  label: vLLM
+  description: vLLM as your site's own fallback AI.
+local-ai:
+  label: Local AI
+  description: Models that run on the visitor's own computer.
+apple-silicon:
+  label: Apple Silicon
+  description: Local models on M-series Macs.
+ai-gateway:
+  label: AI gateway
+  description: Your own server as the last resort, with the key kept server-side.
+webmcp:
+  label: WebMCP
+  description: Page tools offered to the browser's agents.
+agent-skills:
+  label: Agent skills
+  description: Skills that guide the visitor's AI on your site.
+tools:
+  label: Page tools
+  description: Tools the AI calls in your page.
+ask-ai:
+  label: Ask AI
+  description: AI assistants that answer from your docs or site.
