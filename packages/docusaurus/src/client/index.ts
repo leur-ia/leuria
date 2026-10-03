@@ -50,7 +50,7 @@ export const leuria = new Promise<{ ai: Leuria; docs: Docs }>((resolve) => {
 });
 
 async function start(settings: ClientConfig): Promise<void> {
-	const [{ bridge, promptAPI, createAI, server }, { setDefaultAppearance, setDefaultClient }, { createDocs, setupDocs }] = await Promise.all([
+	const [{ bridge, promptAPI, createAI, server }, { setDefaultAppearance, setDefaultClient }, { algoliaSearch, createDocs, setupDocs }] = await Promise.all([
 		import("@leuria/client"),
 		import("@leuria/connect"),
 		import("@leuria/docs"),
@@ -66,6 +66,7 @@ async function start(settings: ClientConfig): Promise<void> {
 
 	const docs = createDocs(ai, {
 		corpus: () => import("@leuria-docusaurus/corpus").then((m) => m.default),
+		search: settings.algolia ? algoliaSearch(settings.algolia) : undefined,
 		navigate,
 	});
 	setupDocs(docs, { title: settings.title, suggestions: settings.suggestions, system: settings.system });
@@ -75,10 +76,8 @@ async function start(settings: ClientConfig): Promise<void> {
 		button.setAttribute("floating", "");
 		document.body.append(button);
 	}
-	if (settings.webmcp) {
-		await docs.load();
-		docs.expose();
-	}
+	// The tools load the corpus when an agent first calls one, not with the page.
+	if (settings.webmcp) docs.expose();
 }
 
 if (ExecutionEnvironment.canUseDOM) {

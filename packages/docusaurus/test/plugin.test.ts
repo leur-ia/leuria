@@ -60,6 +60,12 @@ describe("@leuria/docusaurus", () => {
 		expect(corpus.site).toBe("Acme");
 		expect(corpus.pages.map((p: { url: string }) => p.url)).toEqual(["/docs/intro"]);
 		expect(corpus.sections.map((s: { id: string }) => s.id)).toEqual(["/docs/intro", "/docs/intro#setup"]);
+		// Light: readers read the pages from the site.
+		expect(corpus.pages[0].markdown).toBeUndefined();
+		expect(corpus.sections[1].text).toBe("Install");
+		// With Leuria as the site's search, the text stays, for ⌘K.
+		await leuriaDocusaurus(context, { search: true }).allContentLoaded!({ allContent, actions: {} as never });
+		expect(JSON.parse(readFileSync(join(context.generatedFilesDir, "leuria/corpus.json"), "utf8")).pages[0].markdown).toContain("npm install.");
 		const config = JSON.parse(readFileSync(join(context.generatedFilesDir, "leuria/config.json"), "utf8"));
 		expect(config).toMatchObject({ app: "My docs", askButton: "navbar", webmcp: true });
 	});
@@ -82,6 +88,16 @@ describe("@leuria/docusaurus", () => {
 		const config = JSON.parse(readFileSync(join(context.generatedFilesDir, "leuria/config.json"), "utf8"));
 		expect(config.server).toEqual({ url: "/api/ai/chat/completions", model: "gpt-4o-mini", jsonSchema: true });
 		expect(config.skills).toEqual(["/", "acme/docs-skills/ask#0123abc"]);
+	});
+
+	it("searches with the site's Algolia DocSearch, in the reader's language", () => {
+		const { context } = site();
+		const themeConfig = context.siteConfig.themeConfig as Record<string, unknown>;
+		themeConfig.algolia = { appId: "APP", apiKey: "search-only", indexName: "docs", contextualSearch: true };
+		(context as { i18n: unknown }).i18n = { currentLocale: "fr" };
+		leuriaDocusaurus(context, {});
+		const config = JSON.parse(readFileSync(join(context.generatedFilesDir, "leuria/config.json"), "utf8"));
+		expect(config.algolia).toEqual({ appId: "APP", apiKey: "search-only", indexName: "docs", language: "fr" });
 	});
 
 	it("validates its options and keeps the instance id", () => {

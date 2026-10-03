@@ -19,7 +19,10 @@ export { LeuriaAsk, LeuriaAskButton, openAsk, pageDocs, setupDocs } from "./ask.
 export { LeuriaSearch, LeuriaSearchButton, openSearch } from "./search.js";
 export type { AskOptions } from "./ask.js";
 export { createDocs, Docs, plain } from "./docs.js";
-export type { DocsHit, DocsOptions, DocsSearchOptions } from "./docs.js";
+export type { DocsHit, DocsOptions, DocsSearchOptions, SiteHit, SiteSearch } from "./docs.js";
+export { algoliaSearch } from "./algolia.js";
+export type { AlgoliaOptions } from "./algolia.js";
+export { htmlToMarkdown } from "./html.js";
 export { pagePath } from "./corpus.js";
 export type { DocsCorpus, DocsPage, DocsSection } from "./corpus.js";
 export { renderMarkdown } from "./render.js";

@@ -24,7 +24,9 @@ That's all. The navbar gets an **Ask AI** button, and the panel it opens knows e
 - **The Connect button, if you want it** (`connectButton: true`). The Ask panel offers it anyway when it's needed.
 - **Tools for the browser's agents** (WebMCP). The same docs tools (`search_docs`, `read_page`, `list_pages`, `open_page`) are offered to agents built into the browser.
 
-At build time the plugin reads the Markdown of every docs page (drafts and unlisted pages are left out) and cuts it into sections. Readers fetch that file the first time they search or ask.
+At build time the plugin makes a small index of your docs: each page's title, description and headings (drafts and unlisted pages are left out). Readers download it the first time they ask, never with the page. The assistant reads the pages it needs from your site, like a reader would.
+
+If your site uses Algolia DocSearch, the assistant also searches with it, so it finds any word of your pages. With `search: true`, the index keeps the pages' text too, so Leuria's search finds any word: a bigger download, for sites with no search of their own.
 
 ## Options
 
@@ -36,7 +38,7 @@ At build time the plugin reads the Markdown of every docs page (drafts and unlis
 | `suggestions` | none | Questions offered before the first one |
 | `system` | built in | Replaces the assistant's instructions |
 | `askButton` | `"navbar"` | `"navbar"`, `"floating"` (bottom right), or `"none"` to place `<leuria-ask-button>` yourself |
-| `search` | `false` | Add Leuria's search to the navbar, for sites without one |
+| `search` | `false` | Add Leuria's search to the navbar, for sites without one. The index then keeps the pages' text |
 | `connectButton` | `false` | Also put "Connect your AI" in the navbar |
 | `webmcp` | `true` | Offer the docs tools to the browser's own agents |
 | `pageEmbeddings` | `false` | A small embedding model in the page for search by meaning, for readers whose AI can't embed. About 40 MB, downloaded only when the reader agrees. Its runtime comes from jsDelivr and the model from Hugging Face. Needs `npm install @leuria/web-embed` |
@@ -70,7 +72,7 @@ Leuria comes first: the panel proposes the reader's own AI (ChatGPT through Code
 - **Small models can't use tools**, so with the browser's model the panel searches your docs itself and gives it the best passages with the question.
 - **A reader using another AI** still sees a one-line offer to use their own.
 
-Questions go to the reader's AI, never to your server (unless you set `server` and nothing else can answer). The docs index stays in the reader's browser.
+Questions go to the reader's AI, never to your server (unless you set `server` and nothing else can answer). The docs index stays in the reader's browser. With Algolia DocSearch, search words also go to Algolia, as with your own search box.
 
 ## For coding agents: llms.txt
 
@@ -87,7 +89,7 @@ import { buildCorpus } from "@leuria/docs/build"
 
 const corpus = buildCorpus(
   [{ url: "/docs/intro", title: "Introduction", markdown: readFileSync("docs/intro.md", "utf8") }],
-  { site: "My docs" },
+  { site: "My docs", light: true }, // light: titles and headings only; pages are read from the site
 )
 writeFileSync("public/corpus.json", JSON.stringify(corpus))
 ```
@@ -114,5 +116,7 @@ docs.expose() // the docs tools for the browser's agents (WebMCP)
 
 - `openAsk(question?)` and `openSearch(query?)` open the panel and the search from your own buttons.
 - `docs.search(query)` returns hits by words and by meaning, for your own search UI; `docs.tools` gives the assistant's tools to your own conversation.
+- A light corpus reads pages from your site and keeps their `<article>` (else `<main>`): the pages must be rendered on the server, not only in the browser. Leave `light` off to ship the text instead.
+- `search: algoliaSearch({ appId, apiKey, indexName })` adds your Algolia DocSearch to the search by words (use the public search-only key).
 - `createDocs` options: `version` (the version the reader is on), `meaning: false` (words only), `indexName` and `storage` (where vectors are kept).
 - Set `--leuria-ask-top` on `leuria-ask` to open the panel below your header.

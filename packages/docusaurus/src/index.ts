@@ -56,7 +56,8 @@ export interface Options {
 	/**
 	 * Add a search to the navbar (⌘K), by words and by meaning. For sites
 	 * without one: leave it off next to Algolia DocSearch or a local search.
-	 * Default false.
+	 * It makes the docs index readers download bigger: it keeps the pages'
+	 * text, to find any word. Default false.
 	 */
 	search?: boolean;
 	/** Also put the "Connect your AI" button in the navbar. Default false: the Ask panel offers it when needed. */
@@ -100,9 +101,17 @@ export interface Options {
 /** What the Ask panel needs from a model. */
 export type Needs = { tools?: boolean; images?: boolean; effort?: "light" | "standard" | "deep"; context?: number };
 
+/** The site's Algolia DocSearch, read from `themeConfig.algolia`: the public search-only key. */
+export interface AlgoliaConfig {
+	appId: string;
+	apiKey: string;
+	indexName: string;
+	language?: string;
+}
+
 /** What the client module gets, as JSON. */
 export type ClientConfig = Pick<Options, "title" | "suggestions" | "system" | "server" | "skills"> &
-	Required<Pick<Options, "app" | "askButton" | "webmcp" | "fallback" | "needs">>;
+	Required<Pick<Options, "app" | "askButton" | "webmcp" | "fallback" | "needs">> & { algolia?: AlgoliaConfig };
 
 const NAME = "@leuria/docusaurus";
 
@@ -170,6 +179,19 @@ function addNavbarItems(context: LoadContext, items: NavbarItem[]): void {
 	}
 }
 
+/** The site's DocSearch, when it has one: the Ask panel searches with it, so the corpus needs no text. */
+function siteAlgolia(context: LoadContext): AlgoliaConfig | undefined {
+	const algolia = (context.siteConfig.themeConfig as { algolia?: Partial<AlgoliaConfig> & { contextualSearch?: boolean } }).algolia;
+	if (!algolia?.appId || !algolia.apiKey || !algolia.indexName) return undefined;
+	return {
+		appId: algolia.appId,
+		apiKey: algolia.apiKey,
+		indexName: algolia.indexName,
+		// DocSearch's contextual search (on by default) keeps to the reader's language.
+		language: algolia.contextualSearch === false ? undefined : context.i18n.currentLocale,
+	};
+}
+
 export default function leuriaDocusaurus(context: LoadContext, options: Options = {}): Plugin {
 	const dir = join(context.generatedFilesDir, "leuria");
 	const files = {
@@ -190,6 +212,7 @@ export default function leuriaDocusaurus(context: LoadContext, options: Options 
 		skills: options.skills,
 		fallback: options.fallback ?? "ask",
 		needs: options.needs ?? { tools: true, effort: "light" },
+		algolia: siteAlgolia(context),
 	};
 
 	mkdirSync(dir, { recursive: true });
@@ -216,7 +239,9 @@ export default function leuriaDocusaurus(context: LoadContext, options: Options 
 
 		async allContentLoaded({ allContent }) {
 			const { pages, defaultVersion } = docsPages(context, allContent as Record<string, Record<string, unknown>>, options.docsPluginIds);
-			const corpus = buildCorpus(pages, { site: options.site ?? title, defaultVersion });
+			// Light (titles, descriptions, headings; readers read the pages from the site) unless
+			// Leuria is the site's search: then it keeps the text, so ⌘K finds any word.
+			const corpus = buildCorpus(pages, { site: options.site ?? title, defaultVersion, light: !options.search });
 			writeFileSync(files.corpus, JSON.stringify(corpus));
 		},
 

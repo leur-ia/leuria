@@ -3,6 +3,17 @@ import { createIndex, type IndexState, type VectorIndex, type VectorStorage } fr
 import MiniSearch from "minisearch";
 
 import { type DocsCorpus, type DocsPage, type DocsSection, pagePath } from "./corpus.js";
+import { htmlToMarkdown, markdownSection } from "./html.js";
+
+/** A hit from the site's own search: a page link (with `#anchor`), and the passage it found when it has one. */
+export interface SiteHit {
+	url: string;
+	heading?: string;
+	passage?: string;
+}
+
+/** The site's own search by words (Algolia DocSearch, …), used instead of Leuria's. */
+export type SiteSearch = (query: string, options: { k: number }) => Promise<SiteHit[]>;
 
 export interface DocsOptions {
 	/** The corpus, or how to fetch it (called once, when first needed). */
@@ -14,6 +25,12 @@ export interface DocsOptions {
 	navigate?: (url: string) => void;
 	/** The docs version the reader is on (versioned docs). Default: the version of the page open, else the corpus's default. */
 	version?: () => string | undefined;
+	/**
+	 * The site's own search, searched with Leuria's (by words, over the
+	 * corpus): its hits on the corpus's pages are merged in. Leuria's alone
+	 * answers when it fails.
+	 */
+	search?: SiteSearch;
 	/** Search by meaning, with the reader's embedding model. Default true. */
 	meaning?: boolean;
 	/** Names the vector index in the browser's storage. Default `docs`. */
@@ -32,6 +49,8 @@ export interface DocsHit {
 	heading?: string;
 	/** The start of the section's text, without its heading. */
 	snippet: string;
+	/** The text the site's search found, when it gives one. */
+	passage?: string;
 	/** Found by words, by meaning, or both. */
 	via: "words" | "meaning" | "both";
 }
@@ -57,6 +76,7 @@ export class Docs {
 	private words?: MiniSearch<DocsSection>;
 	private byUrl = new Map<string, DocsPage>();
 	private byId = new Map<string, DocsSection>();
+	private reads = new Map<string, Promise<string>>();
 	/** Search by meaning, built with the reader's model; created once the corpus is loaded. */
 	index?: VectorIndex<{ url: string }>;
 	private readonly listeners = new Set<() => void>();
@@ -124,36 +144,97 @@ export class Docs {
 		const version = allVersions ? undefined : this.version();
 		const inVersion = (section: DocsSection | undefined) => Boolean(section) && (!version || !section!.version || section!.version === version);
 
-		const lists: Array<{ via: "words" | "meaning"; ids: string[] }> = [];
+		const lists: Array<{ via: "words" | "meaning"; hits: DocsHit[] }> = [];
 		if (by !== "meaning") {
-			const ids = this.words!.search(text, { prefix: true, fuzzy: 0.2, boost: { title: 3, heading: 2 } })
-				.map((hit) => String(hit.id))
-				.filter((id) => inVersion(this.byId.get(id)));
-			lists.push({ via: "words", ids: ids.slice(0, k * 2) });
+			// The site's search reads every word of the pages; Leuria's knows the titles and headings. Both count.
+			const site = this.options.search ? this.siteSearch(text, k, version).catch(() => []) : Promise.resolve([]);
+			const own = this.words!.search(text, { prefix: true, fuzzy: 0.2, boost: { title: 3, heading: 2 } })
+				.map((hit) => this.byId.get(String(hit.id))!)
+				.filter(inVersion)
+				.map((section) => this.hit(section, "words"));
+			lists.push({ via: "words", hits: own.slice(0, k * 2) }, { via: "words", hits: (await site).slice(0, k * 2) });
 		}
 		if (by !== "words" && this.index?.getState().status === "ready") {
 			try {
-				const hits = await this.index.search(text, { k: k * 2, filter: (doc) => inVersion(this.byId.get(doc.id)) });
-				lists.push({ via: "meaning", ids: hits.map((h) => h.id) });
+				const found = await this.index.search(text, { k: k * 2, filter: (doc) => inVersion(this.byId.get(doc.id)) });
+				lists.push({ via: "meaning", hits: found.map((h) => this.hit(this.byId.get(h.id)!, "meaning")) });
 			} catch {
 				// Words still answer.
 			}
 		}
 
-		// Reciprocal rank fusion: good in either list, better in both.
-		const scores = new Map<string, { score: number; via: Set<"words" | "meaning"> }>();
-		for (const { via, ids } of lists) {
-			ids.forEach((id, rank) => {
-				const entry = scores.get(id) ?? { score: 0, via: new Set() };
+		// Reciprocal rank fusion: good in any list, better in several.
+		const scores = new Map<string, { score: number; hit: DocsHit; via: Set<"words" | "meaning"> }>();
+		for (const { via, hits } of lists) {
+			hits.forEach((hit, rank) => {
+				const entry = scores.get(hit.id) ?? { score: 0, hit, via: new Set() };
+				// The site's search gives the passage it found: keep it.
+				if (hit.passage) entry.hit = hit;
 				entry.score += 1 / (60 + rank);
 				entry.via.add(via);
-				scores.set(id, entry);
+				scores.set(hit.id, entry);
 			});
 		}
-		return [...scores.entries()]
-			.sort((a, b) => b[1].score - a[1].score)
+		return [...scores.values()]
+			.sort((a, b) => b.score - a.score)
 			.slice(0, k)
-			.map(([id, { via }]) => this.hit(this.byId.get(id)!, via.size === 2 ? "both" : via.has("meaning") ? "meaning" : "words"));
+			.map(({ hit, via }) => ({ ...hit, via: via.size === 2 ? "both" : via.has("meaning") ? "meaning" : "words" }));
+	}
+
+	/** The site's search, as hits on the corpus's pages: other pages, and other versions, are left out. */
+	private async siteSearch(query: string, k: number, version: string | undefined): Promise<DocsHit[]> {
+		const seen = new Set<string>();
+		const hits: DocsHit[] = [];
+		for (const found of await this.options.search!(query, { k })) {
+			const page = this.page(found.url);
+			if (!page || (version && page.version && page.version !== version)) continue;
+			const anchor = found.url.includes("#") ? found.url.slice(found.url.indexOf("#") + 1) : undefined;
+			const id = anchor ? `${page.url}#${anchor}` : page.url;
+			if (seen.has(id)) continue;
+			seen.add(id);
+			hits.push({
+				id,
+				href: id,
+				url: page.url,
+				title: page.title,
+				heading: found.heading ?? this.byId.get(id)?.heading,
+				snippet: plain(found.passage ?? page.description ?? "").slice(0, 240),
+				passage: found.passage,
+				via: "words",
+			});
+		}
+		return hits;
+	}
+
+	/** A page as Markdown: from the corpus, else read from the site (once). */
+	async read(url: string): Promise<string> {
+		await this.load();
+		const page = this.page(url);
+		if (!page) throw new Error(`No page at ${url}.`);
+		if (page.markdown !== undefined) return page.markdown;
+		let reading = this.reads.get(page.url);
+		if (!reading) {
+			reading = fetch(page.url)
+				.then((response) => {
+					if (!response.ok) throw new Error(`The page ${page.url} could not be read (${response.status}).`);
+					return response.text();
+				})
+				.then((html) => htmlToMarkdown(html, new URL(page.url, location.href).href));
+			// A failed read is tried again next time.
+			reading.catch(() => this.reads.delete(page.url));
+			this.reads.set(page.url, reading);
+		}
+		return reading;
+	}
+
+	/** The text behind a hit: what the site's search found, the corpus's section, or the section read from the page. */
+	async passage(hit: DocsHit): Promise<string> {
+		if (hit.passage) return hit.passage;
+		const section = this.byId.get(hit.id);
+		if (section && this.page(hit.url)?.markdown !== undefined) return section.text;
+		const markdown = await this.read(hit.url).catch(() => "");
+		const body = markdownSection(markdown, hit.heading);
+		return body ? (hit.heading ? `${hit.heading}\n\n${body}` : body) : hit.snippet;
 	}
 
 	/** Show a page to the reader. */
@@ -211,7 +292,9 @@ export class Docs {
 	}
 
 	private hit(section: DocsSection, via: DocsHit["via"]): DocsHit {
-		const body = section.heading ? section.text.slice(section.heading.length).trim() : section.text;
+		const page = this.page(section.url);
+		const light = page?.markdown === undefined;
+		const body = light ? (page?.description ?? "") : section.heading ? section.text.slice(section.heading.length).trim() : section.text;
 		return {
 			id: section.id,
 			href: section.anchor ? `${section.url}#${section.anchor}` : section.url,
@@ -232,12 +315,14 @@ export class Docs {
 		execute: async ({ query }) => {
 			const hits = await this.search(query, { k: 6 });
 			if (hits.length === 0) return { hits: [], note: "Nothing matched. Try other words, or list_pages." };
-			return hits.map((hit) => ({
-				page: hit.title,
-				section: hit.heading,
-				link: hit.href,
-				passage: this.byId.get(hit.id)!.text.slice(0, 700),
-			}));
+			return Promise.all(
+				hits.map(async (hit) => ({
+					page: hit.title,
+					section: hit.heading,
+					link: hit.href,
+					passage: (await this.passage(hit)).slice(0, 700),
+				})),
+			);
 		},
 	});
 
@@ -250,11 +335,12 @@ export class Docs {
 			await this.load();
 			const page = this.page(url);
 			if (!page) throw new Error(`No page at ${url}. Use a link from search_docs or list_pages.`);
+			const markdown = await this.read(page.url);
 			const limit = 24_000;
 			return {
 				title: page.title,
 				link: page.url,
-				markdown: page.markdown.length > limit ? `${page.markdown.slice(0, limit)}\n\n[The rest of the page is cut.]` : page.markdown,
+				markdown: markdown.length > limit ? `${markdown.slice(0, limit)}\n\n[The rest of the page is cut.]` : markdown,
 			};
 		},
 	});

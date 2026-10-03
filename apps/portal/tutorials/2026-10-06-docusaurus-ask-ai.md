@@ -54,7 +54,7 @@ export default {
 npm start
 ```
 
-The navbar now has an **Ask AI** button. At build time the plugin read the Markdown of every docs page (drafts and unlisted pages left out) and cut it into sections. Readers fetch that file the first time they ask.
+The navbar now has an **Ask AI** button. At build time the plugin made a small index of your docs: titles, descriptions and headings (drafts and unlisted pages left out). Readers download it the first time they ask, and the assistant reads the pages it needs from your site. If you use Algolia DocSearch, it searches with it too.
 
 ## Step 4: ask with your own AI
 

@@ -9,7 +9,7 @@ import {
 	type TurnContext,
 } from "@leuria/client";
 import { memoryStorage } from "@leuria/store";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildCorpus, cleanMarkdown } from "../src/build.js";
 import { createDocs, type Docs, openAsk, openSearch, renderMarkdown, setupDocs } from "../src/index.js";
@@ -90,6 +90,7 @@ let docs: Docs | undefined;
 afterEach(() => {
 	docs?.destroy();
 	ai?.destroy();
+	vi.unstubAllGlobals();
 	document.body.innerHTML = "";
 	history.replaceState(null, "", "/");
 });
@@ -153,6 +154,99 @@ describe("Docs", () => {
 		const open = docs.pageTools.find((t) => t.name === "open_page")!;
 		await open.execute!({ url: "/docs/tools#errors" }, {} as never);
 		expect(opened).toEqual(["/docs/tools#errors"]);
+	});
+});
+
+/** The tools page as Docusaurus renders it: Prism lines, hash links with zero-width spaces, a table. */
+const TOOLS_HTML = `<html><body><nav>Menu</nav><article><div class="theme-doc-markdown markdown">
+<header><h1>Page tools</h1></header>
+<p>Tools run in the page, whichever <a href="/docs/providers">provider</a> answers.</p>
+<h2 id="define">Define a tool<a class="hash-link" href="#define">\u200b</a></h2>
+<p>Use <code>defineTool</code> with a JSON Schema.</p>
+<div class="theme-code-block"><pre class="prism-code language-sh"><code class="language-sh"><span class="token-line"># not a heading<br></span><span class="token-line">npm install @leuria/client<br></span></code></pre><button>Copy</button></div>
+<table><thead><tr><th>Option</th><th>What</th></tr></thead><tbody><tr><td>name</td><td>The tool's name</td></tr></tbody></table>
+<h2 id="errors">Errors</h2><ul><li>A tool that throws is reported to the model.</li><li>See <code>onError</code>.</li></ul><ol start="3"><li>Third</li></ol>
+</div></article></body></html>`;
+
+/** Answers the site's pages from HTML, and counts the reads. */
+function serveSite(): string[] {
+	const reads: string[] = [];
+	vi.stubGlobal("fetch", async (url: string) => {
+		reads.push(String(url));
+		return String(url).endsWith("/docs/tools") ? new Response(TOOLS_HTML) : new Response("", { status: 404 });
+	});
+	return reads;
+}
+
+describe("a light corpus", () => {
+	it("keeps titles, descriptions and headings, not the text", () => {
+		const corpus = buildCorpus(PAGES, { light: true });
+		expect(corpus.pages[0]!.markdown).toBeUndefined();
+		expect(corpus.sections.filter((s) => s.url === "/docs/tools").map((s) => [s.id, s.text])).toEqual([
+			["/docs/tools", ""],
+			["/docs/tools#define", "Define a tool"],
+			["/docs/tools#errors", "Errors"],
+		]);
+	});
+
+	it("reads a page from the site, once, as Markdown", async () => {
+		const reads = serveSite();
+		ai = createLeuria({ providers: [], autoDetect: false, closeOnUnload: false });
+		docs = createDocs(ai, { corpus: buildCorpus(PAGES, { light: true }), meaning: false });
+		const read = docs.tools[1]!;
+		const page = (await read.execute!({ url: "/docs/tools#define" }, {} as never)) as { markdown: string };
+		expect(page.markdown).toBe(
+			[
+				"# Page tools",
+				"Tools run in the page, whichever [provider](/docs/providers) answers.",
+				"## Define a tool",
+				"Use `defineTool` with a JSON Schema.",
+				"```sh\n# not a heading\nnpm install @leuria/client\n```",
+				"| Option | What |\n| --- | --- |\n| name | The tool's name |",
+				"## Errors",
+				"- A tool that throws is reported to the model.\n- See `onError`.",
+				"3. Third",
+			].join("\n\n"),
+		);
+		await read.execute!({ url: "/docs/tools" }, {} as never);
+		expect(reads).toEqual(["/docs/tools"]);
+	});
+
+	it("gives an AI that can't use tools the sections read from the pages", async () => {
+		serveSite();
+		const small = new SmallModel();
+		ai = createLeuria({ providers: [small], autoDetect: false, closeOnUnload: false });
+		docs = createDocs(ai, { corpus: buildCorpus(PAGES, { light: true }), meaning: false });
+		setupDocs(docs);
+		openAsk("How do I define a tool?");
+		await wait();
+		expect(small.seen[0]).toContain("(/docs/tools#define)\nDefine a tool\n\nUse `defineTool` with a JSON Schema.");
+		// The section ends at the next heading.
+		expect(small.seen[0]).toContain("| name | The tool's name |\n\n---");
+	});
+
+	it("searches with the site's own search, on the corpus's pages, and with Leuria's when it fails", async () => {
+		ai = createLeuria({ providers: [], autoDetect: false, closeOnUnload: false });
+		let fail = false;
+		docs = createDocs(ai, {
+			corpus: buildCorpus(PAGES, { light: true, defaultVersion: "2.0" }),
+			meaning: false,
+			search: async () => {
+				if (fail) throw new Error("offline");
+				return [
+					{ url: "https://example.com/blog/tools", passage: "Not a docs page." },
+					{ url: "https://example.com/docs/tools#errors", heading: "Errors", passage: "A tool that throws is reported to the model." },
+					{ url: "https://example.com/docs/tools#errors", heading: "Errors", passage: "Again." },
+				];
+			},
+		});
+		const hits = await docs.search("errors");
+		expect(hits).toEqual([
+			expect.objectContaining({ href: "/docs/tools#errors", title: "Page tools", heading: "Errors", passage: "A tool that throws is reported to the model." }),
+		]);
+		expect(await docs.passage(hits[0]!)).toBe("A tool that throws is reported to the model.");
+		fail = true;
+		expect((await docs.search("errors"))[0]).toMatchObject({ href: "/docs/tools#errors", via: "words" });
 	});
 });
 

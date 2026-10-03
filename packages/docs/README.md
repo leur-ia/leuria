@@ -18,7 +18,8 @@ setupDocs(docs, { suggestions: ["How do I get started?"] })
 
 | Piece | What |
 | --- | --- |
-| `buildCorpus(pages)` | Pages to a corpus: cleaned Markdown, and sections with the site's anchors |
+| `buildCorpus(pages)` | Pages to a corpus: cleaned Markdown, and sections with the site's anchors. `light: true` keeps titles and headings only, and pages are read from the site |
+| `algoliaSearch(options)` | The site's Algolia DocSearch, for `createDocs({ search })` |
 | `createDocs(ai, options)` | The docs in the page: `search()` by words and by meaning (with [`@leuria/store`](../store)), `tools` for an assistant, `expose()` for the browser's agents (WebMCP) |
 | `<leuria-ask-button>`, `openAsk()` | The Ask panel. AIs that can use tools search and read the docs; others (the browser's small model) get the best passages with the question |
 | `<leuria-search-button>`, `openSearch()` | The ⌘K search, with "Ask AI" for the query |

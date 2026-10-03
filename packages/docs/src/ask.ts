@@ -110,12 +110,10 @@ function systemPrompt(site: string | undefined, which: Mode): string {
 async function passages(docs: Docs, question: string): Promise<string | undefined> {
 	const hits = await docs.search(question, { k: 4 });
 	if (hits.length === 0) return undefined;
-	return hits
-		.map((hit) => {
-			const text = docs.section(hit.id)?.text ?? hit.snippet;
-			return `[${hit.heading ? `${hit.title}: ${hit.heading}` : hit.title}](${hit.href})\n${text.slice(0, 900)}`;
-		})
-		.join("\n\n---\n\n");
+	const found = await Promise.all(
+		hits.map(async (hit) => `[${hit.heading ? `${hit.title}: ${hit.heading}` : hit.title}](${hit.href})\n${(await docs.passage(hit)).slice(0, 900)}`),
+	);
+	return found.join("\n\n---\n\n");
 }
 
 /** Open the Ask panel (made once, at the end of the page), optionally with a question. */

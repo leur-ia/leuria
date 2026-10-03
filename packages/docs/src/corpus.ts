@@ -1,8 +1,8 @@
 /**
- * What a docs site gives Leuria: its pages as Markdown, and the same pages
- * cut into sections for search. Built once, at build time
- * (`@leuria/docs/build`), and fetched by the page when the reader first
- * searches or asks.
+ * What a docs site gives Leuria: its pages, and the same pages cut into
+ * sections for search. Built once, at build time (`@leuria/docs/build`),
+ * and fetched by the page when the reader first searches or asks. A light
+ * corpus leaves the text out: pages are then read from the site itself.
  */
 
 export interface DocsPage {
@@ -10,8 +10,8 @@ export interface DocsPage {
 	url: string;
 	title: string;
 	description?: string;
-	/** The page's text, as Markdown (front matter and MDX imports removed). */
-	markdown: string;
+	/** The page's text, as Markdown (front matter and MDX imports removed). Left out of a light corpus. */
+	markdown?: string;
 	/** For versioned docs: the version this page belongs to. */
 	version?: string;
 }
@@ -26,7 +26,7 @@ export interface DocsSection {
 	heading?: string;
 	/** The heading's anchor on the page. */
 	anchor?: string;
-	/** The section's text, heading first. */
+	/** The section's text, heading first. In a light corpus, the heading alone (the page's description for the top). */
 	text: string;
 	version?: string;
 }

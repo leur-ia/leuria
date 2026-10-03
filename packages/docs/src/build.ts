@@ -23,6 +23,12 @@ export interface BuildCorpusOptions {
 	defaultVersion?: string;
 	/** Longest section before it is cut by paragraph. Default 1200. */
 	maxChars?: number;
+	/**
+	 * Leave the text out: pages keep their title and description, sections
+	 * their heading. Readers then read pages from the site itself, so a big
+	 * docs site stays a small download. Default false.
+	 */
+	light?: boolean;
 }
 
 /**
@@ -72,17 +78,27 @@ function sectionsOf(source: string): RawSection[] {
 }
 
 /** Pages to a corpus: the pages as given, and their sections for search. */
-export function buildCorpus(pages: DocsPage[], { site, defaultVersion, maxChars = 1200 }: BuildCorpusOptions = {}): DocsCorpus {
-	const cleaned = pages.map((page) => ({ ...page, url: pagePath(page.url), markdown: cleanMarkdown(page.markdown) }));
+export function buildCorpus(pages: DocsPage[], { site, defaultVersion, maxChars = 1200, light = false }: BuildCorpusOptions = {}): DocsCorpus {
+	const cleaned = pages.map(({ markdown, ...page }) => ({
+		...page,
+		url: pagePath(page.url),
+		...(light ? {} : { markdown: cleanMarkdown(markdown ?? "") }),
+	}));
 	const sections: DocsSection[] = [];
 	for (const [i, page] of cleaned.entries()) {
 		const seen = new Map<string, number>();
-		for (const raw of sectionsOf(cleanMarkdown(pages[i]!.markdown, { keepAnchors: true }))) {
+		for (const raw of sectionsOf(cleanMarkdown(pages[i]!.markdown ?? "", { keepAnchors: true }))) {
 			// The page's H1 is its title: its text belongs to the page itself.
 			const isTitle = raw.heading !== undefined && raw.heading === page.title;
 			const heading = isTitle ? undefined : raw.heading;
 			const anchor = isTitle ? undefined : raw.anchor;
 			const base = anchor ? `${page.url}#${anchor}` : page.url;
+			if (light) {
+				// One per heading: the text before the H1 and under it are both the page's top.
+				if (!seen.has(base)) sections.push({ id: base, url: page.url, title: page.title, heading, anchor, text: heading ?? page.description ?? "", version: page.version });
+				seen.set(base, 1);
+				continue;
+			}
 			for (const chunk of chunkMarkdown(raw.body, { maxChars })) {
 				const n = seen.get(base) ?? 0;
 				seen.set(base, n + 1);
