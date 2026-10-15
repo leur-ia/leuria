@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
 
 import { GrantStore } from "../src/grants.js";
@@ -340,6 +340,37 @@ describe("sessions", () => {
 			statuses.push((await post("/session/prepare", origin, { prompt: "x" }, token as string)).status);
 		}
 		expect(statuses).toEqual([201, 201, 201, 201, 400]);
+		engine.revoke(origin);
+	});
+
+	it("end when the page is gone without closing (crash, killed tab)", async () => {
+		const origin = "http://localhost:7005";
+		const { token } = await pair(origin);
+		const { sessionId, registrationToken } = (await json(await post("/session/prepare", origin, { prompt: "x" }, token as string))) as { sessionId: string; registrationToken: string };
+		const channel = await new Promise<WebSocket>((resolve, reject) => {
+			const reg = new WebSocket(`ws://127.0.0.1:${PORT}/webmcp/register`, { headers: { Origin: origin } });
+			reg.on("error", reject);
+			reg.on("open", () => reg.send(JSON.stringify({ type: "register", token: registrationToken })));
+			reg.on("message", (d) => {
+				const m = JSON.parse(d.toString()) as { channel: string; token: string };
+				reg.close();
+				const ch = new WebSocket(`ws://127.0.0.1:${PORT}${m.channel}?token=${m.token}`, { headers: { Origin: origin } });
+				ch.on("error", reject);
+				ch.on("open", () => resolve(ch));
+			});
+		});
+		vi.useFakeTimers({ toFake: ["setTimeout"] });
+		try {
+			channel.terminate();
+			// The engine notices the drop and starts the grace timer.
+			for (let i = 0; i < 1000 && vi.getTimerCount() === 0; i++) await new Promise((resolve) => setImmediate(resolve));
+			expect(vi.getTimerCount()).toBe(1);
+			expect(engine.sessions.get(sessionId)?.status).toBe("pending_approval");
+			vi.advanceTimersByTime(30_000);
+		} finally {
+			vi.useRealTimers();
+		}
+		expect(engine.sessions.get(sessionId)?.status).toBe("completed");
 		engine.revoke(origin);
 	});
 });

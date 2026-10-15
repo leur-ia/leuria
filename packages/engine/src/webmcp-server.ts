@@ -77,6 +77,8 @@ interface WebMcpChannel {
 	skills: SkillContent[];
 	pendingRequests: Map<string, PendingRequest>;
 	pingTimer: ReturnType<typeof setInterval> | null;
+	/** Counts down after the browser left; a reconnect cancels it. */
+	goneTimer: ReturnType<typeof setTimeout> | null;
 }
 
 interface RegistrationEntry {
@@ -111,6 +113,8 @@ const REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
 const HTTP_KEEPALIVE_INTERVAL_MS = 20_000;
 /** Browser WebSocket ping cadence. */
 const PING_INTERVAL_MS = 15_000;
+/** How long a browser may stay disconnected before its session ends. The page retries for ~15 s. */
+const BROWSER_GONE_MS = 30_000;
 
 const SERVER_NAME = "leuria-webmcp";
 /** MCP revisions this relay speaks; the client's choice wins when listed. */
@@ -128,6 +132,12 @@ export class WebMcpServer {
 	private readonly tokenToChannel = new Map<string, string>();
 	private readonly registerWss: WebSocketServer;
 	private readonly channelWss: WebSocketServer;
+	/**
+	 * The page is gone (its WS closed and did not come back within the
+	 * grace period): the session it held should end, or it counts against
+	 * the site's limit until the engine restarts.
+	 */
+	onBrowserGone?: (sessionId: string) => void;
 
 	constructor(
 		private readonly logger: Logger,
@@ -167,6 +177,7 @@ export class WebMcpServer {
 			skills: [],
 			pendingRequests: new Map(),
 			pingTimer: null,
+			goneTimer: null,
 		};
 
 		this.channels.set(channelId, channel);
@@ -217,6 +228,7 @@ export class WebMcpServer {
 				clearInterval(channel.pingTimer);
 				channel.pingTimer = null;
 			}
+			if (channel.goneTimer) clearTimeout(channel.goneTimer);
 			for (const [, pending] of channel.pendingRequests) {
 				clearTimeout(pending.timeout);
 				pending.reject(new Error("WebMCP channel removed"));
@@ -530,6 +542,10 @@ export class WebMcpServer {
 			clearInterval(channel.pingTimer);
 			channel.pingTimer = null;
 		}
+		if (channel.goneTimer) {
+			clearTimeout(channel.goneTimer);
+			channel.goneTimer = null;
+		}
 		channel.browserWs = ws;
 		this.logger.info("WebMCP browser connected", { channelId: channel.id });
 
@@ -562,6 +578,13 @@ export class WebMcpServer {
 			this.logger.info("WebMCP browser disconnected", {
 				channelId: channel.id,
 			});
+			// The page reconnects with backoff (a few seconds at most); a crash,
+			// a killed tab or a lost `close` request never does.
+			channel.goneTimer = setTimeout(() => {
+				channel.goneTimer = null;
+				if (this.channels.get(channel.id) === channel && !channel.browserWs) this.onBrowserGone?.(channel.sessionId);
+			}, BROWSER_GONE_MS);
+			channel.goneTimer.unref?.();
 		});
 
 		ws.on("error", (err) => {

@@ -114,6 +114,8 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 		stdioMcpCommand: options.stdioMcpCommand,
 		onAgentState: options.onAgentState,
 	});
+	// A page that went away (crash, killed tab, lost close request) frees its slot.
+	webMcpServer.onBrowserGone = (sessionId) => sessions.close(sessionId);
 	// A revoked site loses its running agents too.
 	grants.onRemoved((origin) => sessions.closeWhere((o) => o === origin));
 	// A site's AI or model changed: its open conversation ends, the next message uses the new one.
