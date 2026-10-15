@@ -21,8 +21,9 @@ import type { Duplex } from "node:stream";
 
 import type { GrantStore } from "./grants.js";
 import { normalizeOrigin } from "./grants.js";
-import { DEFAULT_PORT } from "./home.js";
+import { DEFAULT_PORT, loadConfig } from "./home.js";
 import { parseBody, sendJson } from "./http-utils.js";
+import { DecisionRefusedError, type Decisions, NoDecisionModelError, parseDecideBody, systemOneDecisions } from "./llm/decisions.js";
 import { type Embeddings, localEmbeddings, NoEmbedderError, parseEmbedBody } from "./llm/embeddings.js";
 import type { Logger } from "./logger.js";
 import { Pairing, type PairingRequestInfo } from "./pairing.js";
@@ -73,6 +74,8 @@ interface EngineOptions {
 	onAgentState?: SessionManagerOptions["onAgentState"];
 	/** Embeddings for connected sites. Default: an embedding model in LM Studio or Ollama on this computer. */
 	embeddings?: Embeddings;
+	/** Decisions for connected sites. Default: a decision model in LM Studio or Ollama on this computer, or the service in config.json. */
+	decisions?: Decisions;
 	/** The skills sites give their AI. Default: fetched from GitHub or the site, cached in `~/.leuria/skills`. */
 	skills?: SkillService;
 }
@@ -98,6 +101,8 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 	const port = options.port ?? DEFAULT_PORT;
 	const { logger, grants } = options;
 	const embeddings = options.embeddings ?? localEmbeddings();
+	// A site's own choice of decision model, else the one every site gets.
+	const decisions = options.decisions ?? systemOneDecisions((origin) => (origin ? grants.get(origin)?.decide : undefined) ?? loadConfig().decisions);
 	const selfOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
 	const allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 	const silent = options.silent ?? Boolean(options.admin);
@@ -234,7 +239,7 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 					approvals: options.admin ? "app" : "page",
 					...(caller.kind === "site" ? { paired: caller.authorized } : {}),
 					// A connected site hears which embedding model it would get.
-					...(caller.kind !== "site" || caller.authorized ? { embed: (await embeddings.find())?.model } : {}),
+					...(caller.kind !== "site" || caller.authorized ? { embed: (await embeddings.find())?.model, decide: (await decisions.find(caller.kind === "site" ? caller.origin : undefined))?.model } : {}),
 				});
 				return;
 			}
@@ -270,6 +275,25 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 				} catch (error) {
 					const none = error instanceof NoEmbedderError;
 					sendJson(res, none ? 503 : 502, { error: error instanceof Error ? error.message : String(error), ...(none ? { code: "no_embedder" } : {}) });
+				}
+				return;
+			}
+			if (pathname === "/decide" && req.method === "POST") {
+				let request: ReturnType<typeof parseDecideBody>;
+				try {
+					request = parseDecideBody(await parseBody(req));
+				} catch (error) {
+					sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+					return;
+				}
+				try {
+					sendJson(res, 200, await decisions.decide(request, undefined, caller.kind === "site" ? caller.origin : undefined));
+				} catch (error) {
+					const message = error instanceof Error ? error.message : String(error);
+					if (error instanceof NoDecisionModelError) sendJson(res, 503, { error: message, code: "no_decider" });
+					// The service's own refusal of the request (a bad question) is the page's to fix; a bad key is the visitor's.
+					else if (error instanceof DecisionRefusedError) sendJson(res, error.status === 401 || error.status === 403 ? 502 : 400, { error: message });
+					else sendJson(res, 502, { error: message });
 				}
 				return;
 			}

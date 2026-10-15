@@ -10,6 +10,8 @@ Small recipes, each one complete. On the portal you can edit and run them in the
 | [A conversation with context](conversation-context.md) | Follow-ups, and values bound to a turn | Any AI |
 | [The visitor answers](visitor-answers.md) | A tool that waits for the visitor's confirmation | An AI that uses tools |
 | [Search by meaning](search-by-meaning.md) | An index of your content in the browser | An embedding model |
+| [Triage a message](triage.md) | Which team, how frustrated, how urgent: typed answers from a decision model | A decision model |
+| [A smart home that decides first](smart-home.md) | Every question at once, then chat only to split or converse | A decision model, and any AI |
 | [Middleware](middleware.md) | Watch and redact every tool call | An AI that uses tools |
 | [Who answers](routing.md) | The cascade, routing options, and what to do when no AI can answer | Nothing |
 

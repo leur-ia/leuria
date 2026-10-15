@@ -42,6 +42,7 @@ for await (const event of convo.send("Which mug is cheapest?")) {
 | [Skills](guides/skills.md) | Instructions for the visitor's AI on your site, from your origin or shared on GitHub |
 | [Structured output](guides/structured-output.md) | A JSON Schema in, a parsed and validated object out, from any provider |
 | [Embeddings and search by meaning](guides/embeddings.md) | `ai.embed()`, `@leuria/store` and a model in the page with `@leuria/web-embed` |
+| [Decisions](guides/decisions.md) | `ai.decide()`: typed questions answered with a choice, a score or a probability by a System One model |
 | [Connect UI](guides/connect-ui.md) | The connect flow, and Leuria's elements for any page or for React |
 | [React](guides/react.md) | `@leuria/react` hooks |
 | [Custom providers](guides/custom-providers.md) | Plug another model or API into the cascade |

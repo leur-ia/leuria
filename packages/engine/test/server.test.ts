@@ -28,6 +28,10 @@ beforeAll(async () => {
 			find: async () => ({ provider: { id: "lmstudio", kind: "lmstudio", name: "LM Studio", baseUrl: "http://127.0.0.1:1/v1" }, model: "fake-embed" }),
 			embed: async (texts, kind) => ({ model: "fake-embed", vectors: texts.map((t) => [t.length, kind === "query" ? 1 : 0]) }),
 		},
+		decisions: {
+			find: async () => ({ model: "fake-jev", name: "Fake", local: true, baseUrl: "http://127.0.0.1:1/v1" }),
+			decide: async ({ questions }) => ({ model: "fake-jev", answers: Object.fromEntries(Object.keys(questions).map((id) => [id, { type: "noul", noul: 1 }])) }),
+		},
 	});
 });
 afterAll(() => engine.close());
@@ -262,6 +266,19 @@ describe("a silent engine (the desktop app)", () => {
 		const res = await fetch(`${base}/admin/status`, { headers: { Origin: "tauri://localhost" } });
 		expect(res.status).toBe(401);
 		expect(res.headers.get("access-control-allow-origin")).toBe("tauri://localhost");
+	});
+});
+
+describe("decisions", () => {
+	it("are only for connected sites, which hear the model in health", async () => {
+		const origin = "http://decide.test";
+		const body = { state: "Help!", questions: { urgent: { type: "noul", instructions: "Urgent?" } } };
+		expect((await post("/decide", origin, body)).status).toBe(401);
+		const { token } = await pair(origin);
+		const health = await json(await fetch(`${BASE}/health`, { headers: { Origin: origin, Authorization: `Bearer ${token}` } }));
+		expect(health.decide).toBe("fake-jev");
+		expect(await json(await post("/decide", origin, body, token as string))).toEqual({ model: "fake-jev", answers: { urgent: { type: "noul", noul: 1 } } });
+		expect((await post("/decide", origin, { state: "x", questions: {} }, token as string)).status).toBe(400);
 	});
 });
 

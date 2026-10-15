@@ -142,7 +142,9 @@ export type Capability =
 	/** Accepts images in user messages. */
 	| "images"
 	/** Produces embeddings. */
-	| "embed";
+	| "embed"
+	/** Answers typed questions with a choice, a score or a probability (System One). */
+	| "decide";
 
 /** Where requests go, so the page can tell the visitor. */
 export type Locality =
@@ -173,6 +175,8 @@ export interface ProviderState {
 	capabilities: Capability[];
 	/** The embedding model, when the provider can embed now (`embed` capability). Vectors of different models can't be compared. */
 	embedModel?: string;
+	/** The decision model, when the provider can decide now (`decide` capability). */
+	decideModel?: string;
 	/** Plain-language model or agent name, e.g. "Claude Code", "Gemini Nano". */
 	model?: string;
 	/** What `connect()` would do, when `status` is `needs-action`. */
@@ -247,7 +251,7 @@ export interface ProviderSession {
 }
 
 /** What a provider is for. */
-export type Service = "chat" | "embed";
+export type Service = "chat" | "embed" | "decide";
 
 export interface EmbedRequest {
 	texts: string[];
@@ -265,6 +269,54 @@ export interface EmbedResult {
 	/** The model that made them. */
 	model: string;
 }
+
+// ── Decisions (System One) ─────────────────────────────────────────────
+
+/**
+ * A typed question about `state`, in System One's own shape. Build them
+ * with {@link noul}, {@link choice} and {@link score} to keep the answer
+ * types; `instructions` may be an object naming fields of `state`.
+ */
+export type DecideQuestion =
+	/** Yes or no: the answer is a probability. */
+	| { type: "noul"; instructions: unknown; criteria?: { true?: unknown; false?: unknown } }
+	/** One of the options (option → description). */
+	| { type: "choice"; instructions: unknown; criteria: Record<string, unknown> }
+	/** A level on an ordered scale (descriptions, low to high). */
+	| { type: "score"; instructions: unknown; criteria: unknown[] };
+
+export type DecideAnswer<Q> = Q extends { type: "noul" }
+	? { type: "noul"; noul: number }
+	: Q extends { type: "choice"; criteria: Record<infer K extends string, unknown> }
+		? { type: "choice"; choice: K; probabilities: Record<K, number>; confidence: number }
+		: Q extends { type: "score" }
+			? { type: "score"; score: number; legend: Record<string, string>; probabilities: Record<string, number>; confidence: number }
+			: never;
+
+export interface DecideRequest<Q extends Record<string, DecideQuestion> = Record<string, DecideQuestion>> {
+	/** What the questions are about: text, or an object whose fields the questions name. */
+	state: unknown;
+	questions: Q;
+	/** A model of the service; its latest by default. */
+	model?: string;
+	signal?: AbortSignal;
+}
+
+export interface DecideResult<Q extends Record<string, DecideQuestion> = Record<string, DecideQuestion>> {
+	/** The model that answered. */
+	model: string;
+	/** One answer per question, by its key. */
+	answers: { [K in keyof Q]: DecideAnswer<Q[K]> };
+	usage?: { input_tokens?: number | null; output_tokens?: number | null };
+}
+
+/** A yes/no question; the answer is `noul`, 0 (no) to 1 (yes). */
+export const noul = (instructions: unknown, criteria?: { true?: unknown; false?: unknown }) =>
+	({ type: "noul", instructions, ...(criteria ? { criteria } : {}) }) as const satisfies DecideQuestion;
+/** A question with options (option → description, or null); the answer is `choice` with `probabilities`. */
+export const choice = <const K extends string>(instructions: unknown, criteria: Record<K, unknown>) => ({ type: "choice", instructions, criteria }) as const;
+/** A question with 2 to 10 ordered levels, low to high; the answer is `score`, possibly between levels. */
+export const score = (instructions: unknown, criteria: unknown[]) => ({ type: "score", instructions, criteria }) as const;
 
 export interface Provider extends ProviderInfo {
 	/** What it serves. Default `["chat"]`; an embedder alone is `["embed"]`. */
@@ -293,6 +345,8 @@ export interface Provider extends ProviderInfo {
 	createSession: (options: SessionOptions) => Promise<ProviderSession>;
 	/** Embed texts; present on providers that offer `embed`. */
 	embed?: (request: EmbedRequest) => Promise<EmbedResult>;
+	/** Answer typed questions; present on providers that offer `decide`. */
+	decide?: (request: DecideRequest) => Promise<DecideResult>;
 }
 
 // ── Runs ───────────────────────────────────────────────────────────────

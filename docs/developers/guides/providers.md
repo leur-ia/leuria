@@ -37,7 +37,7 @@ The page never needs to know which provider answered, but it can: every run star
 
 | Provider | Id | Locality | Capabilities | Visitor action |
 | --- | --- | --- | --- | --- |
-| `leuria()` | `bridge` | device | chat, tools, agent, images; embed when the visitor has a local embedding model (structured output through the tool route) | `connect`: a `leuria://connect` link opens Leuria, which asks in its own window |
+| `leuria()` | `bridge` | device | chat, tools, agent, images; embed when the visitor has a local embedding model; decide when they have a decision model (LM Studio, Ollama) or set a service (structured output through the tool route) | `connect`: a `leuria://connect` link opens Leuria, which asks in its own window |
 | `promptAPI()` | `browser` | device | chat, structured; tools with `promptAPI({ tools: true })` | `download`: fetch the browser's model |
 | `server({ url })` | `server` | site | chat, tools (unless `tools: false`); structured natively with `jsonSchema: true`; images with `images: true` | none |
 
@@ -73,7 +73,7 @@ Visitors often run a model far stronger (and costlier) than a site's features ne
 leuria({ app: "Kiln & Co.", needs: { tools: true, effort: "light" } })
 ```
 
-- `tools`, `images`: the capabilities your features use.
+- `tools`, `images`, `decide`: the capabilities your features use (`decide`: a decision model, see [Decisions](decisions.md)).
 - `effort`: how hard the tasks are. `light` (answer, extract, summarize), `standard` (several steps with tools), `deep` (long reasoning, agentic work).
 - `context`: about how much text one turn sends, in tokens.
 
@@ -110,10 +110,11 @@ try {
 
 `ai.getState()` / `ai.subscribe(listener)` is an immutable snapshot. It fits `useSyncExternalStore` directly.
 
-- `providers`: every provider's state: `id`, `label`, `locality`, `offers`, `status` (`unknown`, `detecting`, `unavailable`, `needs-action`, `downloading`, `ready`), `capabilities`, `model` (e.g. "Claude Code", "Gemini Nano"), `action` (`connect` or `download`), `progress` (0 to 1 while downloading), `detail` (why, in words), `embedModel`.
+- `providers`: every provider's state: `id`, `label`, `locality`, `offers`, `status` (`unknown`, `detecting`, `unavailable`, `needs-action`, `downloading`, `ready`), `capabilities`, `model` (e.g. "Claude Code", "Gemini Nano"), `action` (`connect` or `download`), `progress` (0 to 1 while downloading), `detail` (why, in words), `embedModel`, `decideModel`.
 - `active`: the provider a plain chat request would use now.
 - `pending`: a provider that needs a visitor action and is preferred over the active one (or none is ready). Offer it, even while a fallback answers, so the visitor can bring their own AI back.
 - `embedder` and `embedPending`: the same, for embeddings (see [Embeddings](embeddings.md)).
+- `decider` and `decidePending`: the same, for decisions (see [Decisions](decisions.md)).
 - `alternatives`: providers waiting for the visitor to pick them instead of their own AI (see [The visitor's own AI first](#the-visitors-own-ai-first)).
 
 Providers are detected at creation, again when the page regains focus, and every `watchMs` (default 5000 ms) while the page is visible, so the page follows what the visitor does in Leuria. `autoDetect: false` turns this off; `ai.detect()` checks again by hand.

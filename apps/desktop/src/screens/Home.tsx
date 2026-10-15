@@ -1,15 +1,15 @@
 import { BridgeStatus, Icon, type IconName, Logo } from "@leuria/pearl";
-import { Badge, Box, Button, Callout, Card, DropdownMenu, Flex, Heading, IconButton, Link, Select, Spinner, Switch, Text } from "@radix-ui/themes";
+import { Badge, Box, Button, Callout, Card, DropdownMenu, Flex, Heading, IconButton, Link, Select, Spinner, Switch, Text, TextField } from "@radix-ui/themes";
 import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "@sinuxjs/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AgentModelSelect } from "../components/AgentModelSelect";
 import { AiChoiceCard } from "../components/AiChoiceCard";
 import { costWords, needsSentence, verdictOf, verdictWords } from "../fit-words";
 import { Disclosure } from "../components/Disclosure";
 import { SiteSkills } from "../components/SiteSkills";
-import { type AgentModels, describeCheck, type Fit, type SearchModels, searchModelName, signInLabel, friendlyName, trayName, type Site, type Status, type TestResult, type YourAi } from "../engine";
+import { type AgentModels, type DecisionModels, describeCheck, engine, errorMessage, TYPESAFE_URL, type Fit, type SearchModels, searchModelName, signInLabel, friendlyName, trayName, type Site, type Status, type TestResult, type YourAi } from "../engine";
 import { appStore } from "../stores/app.store";
 import { homeStore, type HomeTab } from "../stores/home.store";
 import { onboardingStore } from "../stores/onboarding.store";
@@ -19,7 +19,7 @@ const DEFAULT = "default";
 const SAME_MODEL = "leuria:same-as-ai";
 
 export function Home({ status }: { status: Status }) {
-	const { tab, sites, ais, autostart, checks, modelRefresh, settingUp, signInNeeded, aiModels, search, focus, fits, error } = useStore(homeStore);
+	const { tab, sites, ais, autostart, checks, modelRefresh, settingUp, signInNeeded, aiModels, search, decisions, focus, fits, error } = useStore(homeStore);
 	const models = useStore(appStore, (s) => s.models);
 
 	useEffect(() => {
@@ -31,6 +31,8 @@ export function Home({ status }: { status: Status }) {
 	// Looked for when the tab opens: the visitor may have loaded a model meanwhile.
 	useEffect(() => {
 		if (tab === "ais") void homeStore.loadSearch();
+		// Decision models: the AIs tab chooses one, the Websites tab may give a site its own.
+		if (tab === "ais" || tab === "sites") void homeStore.loadDecisions();
 	}, [tab]);
 
 	return (
@@ -74,6 +76,7 @@ export function Home({ status }: { status: Status }) {
 									<div>
 										{sites.map((site) => (
 											<SiteRow
+												decisions={decisions}
 												key={site.origin}
 												site={site}
 												status={status}
@@ -131,6 +134,7 @@ export function Home({ status }: { status: Status }) {
 							</div>
 						</Card>
 						<SearchCard search={search} error={error} />
+						<DecisionsCard decisions={decisions} error={error} />
 					</Flex>
 				)}
 
@@ -218,6 +222,7 @@ function SiteRow({
 	signInNeeded,
 	focused,
 	fit,
+	decisions,
 }: {
 	site: Site;
 	status: Status;
@@ -233,6 +238,8 @@ function SiteRow({
 	focused: boolean;
 	/** How Your AIs fit what the site said it needs. */
 	fit: Fit | null;
+	/** Decision models on this computer, and the one every site gets. */
+	decisions: DecisionModels | null;
 }) {
 	// A site picks among Your AIs (Add an AI puts more here).
 	const choices = ais.filter((a) => !a.default);
@@ -246,6 +253,9 @@ function SiteRow({
 	const usesAi = ownAi ? friendlyName(ownAi) : "the default";
 	const ownModelName = ownModel ? (models?.options.find((m) => m.id === ownModel)?.name ?? ownModel) : undefined;
 	const siteName = site.app ?? new URL(site.origin).host;
+	// Decisions: the site follows the choice every site gets, or has its own (a model here, off, or a service set from the engine).
+	const siteDecide = site.decide === undefined ? FOLLOW : site.decide === "off" ? OFF : "provider" in site.decide ? modelValue(site.decide.provider, site.decide.model) : SERVICE;
+	const everyone = decisions?.current ? `${decisions.current.model} · ${decisions.current.name}` : "none";
 	// What answers this site, what it costs, and how it fits what the site said it needs.
 	const current = ownModel ?? models?.current;
 	const currentName = models?.options.find((m) => m.id === current)?.name;
@@ -346,6 +356,40 @@ function SiteRow({
 									</Select.Content>
 								</Select.Root>
 							</Flex>
+							{(site.needs?.decide || site.decide !== undefined || (decisions?.models.length ?? 0) > 0) && (
+								<Flex direction="column" gap="1">
+									<Text as="label" size="2" weight="medium">
+										Decision model
+									</Text>
+									<Select.Root
+										value={siteDecide}
+										disabled={busy}
+										onValueChange={(value) => {
+											if (value === SERVICE) return;
+											const found = decisions?.models.find((m) => modelValue(m.provider.id, m.model) === value);
+											void homeStore.setSiteDecide(site.origin, value === FOLLOW ? null : value === OFF ? "off" : found ? { provider: found.provider.id, model: found.model } : null);
+										}}
+									>
+										<Select.Trigger aria-label={`Decision model for ${site.origin}`} style={{ width: "100%" }} />
+										<Select.Content position="popper">
+											<Select.Item value={FOLLOW}>Same as every site · {everyone}</Select.Item>
+											{(decisions?.models.length ?? 0) > 0 && <Select.Separator />}
+											{decisions?.models.map((m) => (
+												<Select.Item key={modelValue(m.provider.id, m.model)} value={modelValue(m.provider.id, m.model)}>
+													{m.model} · {m.provider.name}
+												</Select.Item>
+											))}
+											{siteDecide === SERVICE && site.decide && typeof site.decide === "object" && "baseUrl" in site.decide && (
+												<Select.Item value={SERVICE}>
+													{site.decide.model ?? "jev-latest"} · {site.decide.baseUrl === TYPESAFE_URL ? "TypeSafe" : site.decide.baseUrl}
+												</Select.Item>
+											)}
+											<Select.Separator />
+											<Select.Item value={OFF}>Off for this site</Select.Item>
+										</Select.Content>
+									</Select.Root>
+								</Flex>
+							)}
 							{models && models.options.length > 1 && !busy && (
 								<Flex direction="column" gap="1">
 									<Text as="label" size="2" weight="medium">
@@ -389,7 +433,174 @@ function SiteRow({
 
 const AUTO = "auto";
 const OFF = "off";
+const FOLLOW = "follow";
+const SERVICE = "service";
+const TYPESAFE = "typesafe";
+const OTHER = "other";
 const modelValue = (provider: string, model: string) => `${provider}\u0000${model}`;
+
+/**
+ * Decisions: some sites ask a System One model typed questions. A model
+ * on this computer (nimble, tev1… in LM Studio or Ollama), or a service:
+ * TypeSafe with the visitor's key, or any other speaking the same API.
+ */
+function DecisionsCard({ decisions, error }: { decisions: DecisionModels | null; error: string }) {
+	const choice = decisions?.choice ?? AUTO;
+	const service = typeof choice === "object" && "baseUrl" in choice ? choice : null;
+	const chosen = typeof choice === "object" && "provider" in choice ? choice : null;
+	const chosenMissing = chosen !== null && decisions !== null && !decisions.models.some((m) => m.provider.id === chosen.provider && m.model === chosen.model);
+	const value = service ? (service.baseUrl === TYPESAFE_URL ? TYPESAFE : OTHER) : chosen ? modelValue(chosen.provider, chosen.model) : choice === OFF ? OFF : AUTO;
+	/** A service being set up: its fields, until Save. */
+	const [editing, setEditing] = useState<typeof TYPESAFE | typeof OTHER | null>(null);
+	const [baseUrl, setBaseUrl] = useState("");
+	const [model, setModel] = useState("");
+	const [key, setKey] = useState("");
+	const [busy, setBusy] = useState(false);
+	/** What a look at the service found: its models, and how a try went. */
+	const [probe, setProbe] = useState<{ models: Array<{ id: string; decision: boolean }>; tried?: { model: string; ok: boolean; ms: number; error?: string }; error?: string } | null>(null);
+	const look = async (tryModel?: string) => {
+		setBusy(true);
+		try {
+			const found = await engine.probeDecisionService({ baseUrl, ...(key.trim() ? { apiKey: key } : {}), ...(tryModel ? { model: tryModel } : {}) });
+			setProbe(found);
+			if (!model && found.tried) setModel(found.tried.model);
+		} catch (error) {
+			setProbe({ models: [], error: errorMessage(error) });
+		} finally {
+			setBusy(false);
+		}
+	};
+	const onChange = (next: string) => {
+		setEditing(null);
+		setProbe(null);
+		if (next === TYPESAFE || next === OTHER) return setEditing(next);
+		if (next === AUTO || next === OFF) return void homeStore.setDecisions(next);
+		const found = decisions?.models.find((m) => modelValue(m.provider.id, m.model) === next);
+		if (found) void homeStore.setDecisions({ provider: found.provider.id, model: found.model });
+	};
+	const save = async () => {
+		setBusy(true);
+		await homeStore.setDecisions(editing === OTHER ? { baseUrl, ...(key.trim() ? { apiKey: key } : {}), ...(model.trim() ? { model } : {}) } : { apiKey: key });
+		setBusy(false);
+		setEditing(null);
+		setKey("");
+	};
+
+	let line: string;
+	if (!decisions) line = "Looking for a decision model…";
+	else if (choice === OFF) line = "Off: sites can't use a decision model.";
+	else if (chosenMissing) line = `${chosen.model} isn't available now. Open ${decisions.models.find((m) => m.provider.id === chosen.provider)?.provider.name ?? chosen.provider} and pull it, or choose another.`;
+	else if (decisions.current?.local) line = `Sites decide with ${decisions.current.model} · ${decisions.current.name}, on this computer.`;
+	else if (decisions.current) line = `Sites decide with ${decisions.current.model} · ${decisions.current.name}${decisions.current.local ? ", on this computer" : service?.hasKey ? ", with your key" : ""}.`;
+	else line = "No decision model on this computer yet. Load one in LM Studio or Ollama (nimble, for example), or use a service.";
+
+	const label = choice === AUTO ? "Automatic" : choice === OFF ? "Off" : service ? (service.baseUrl === TYPESAFE_URL ? "TypeSafe" : service.baseUrl) : chosen!.model;
+	return (
+		<section className="page-section" aria-labelledby="decisions-heading">
+			<Flex direction="column" gap="1">
+				<Heading as="h2" size="4" id="decisions-heading">
+					Decisions
+				</Heading>
+				<Text size="2" color="gray">
+					Some websites sort, score or route things with a decision model instead of a chat. On this computer it stays here; a service answers on your key.
+				</Text>
+			</Flex>
+			<Card size="2">
+				<Flex direction="column" gap="3">
+					<Flex gap="2" align="center" role="status">
+						{decisions?.current && choice !== OFF && !chosenMissing && (
+							<Text color="green">
+								<Icon name="check" size={16} />
+							</Text>
+						)}
+						<Text size="2">{line}</Text>
+					</Flex>
+					{decisions && (
+						<Disclosure label="Decision model" value={label}>
+							<Flex direction="column" gap="2">
+								<Select.Root value={editing ?? value} onValueChange={onChange}>
+									<Select.Trigger aria-label="Decision model" style={{ width: "100%" }} />
+									<Select.Content position="popper">
+										<Select.Item value={AUTO}>Automatic · the first one on this computer</Select.Item>
+										{decisions.models.length > 0 && <Select.Separator />}
+										{decisions.models.map((m) => (
+											<Select.Item key={modelValue(m.provider.id, m.model)} value={modelValue(m.provider.id, m.model)}>
+												{m.model} · {m.provider.name}
+											</Select.Item>
+										))}
+										{chosenMissing && <Select.Item value={value}>{chosen.model} (not available now)</Select.Item>}
+										<Select.Separator />
+										<Select.Item value={TYPESAFE}>TypeSafe (Jev) · with your key</Select.Item>
+										<Select.Item value={OTHER}>Another service (your company's…)</Select.Item>
+										<Select.Separator />
+										<Select.Item value={OFF}>Off</Select.Item>
+									</Select.Content>
+								</Select.Root>
+								{editing && (
+									<Flex direction="column" gap="2">
+										{editing === OTHER && <TextField.Root placeholder="Address, e.g. http://localhost:8000/v1" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} aria-label="Address" />}
+										{editing === OTHER && probe && probe.models.length > 0 ? (
+											<Select.Root value={model} onValueChange={setModel}>
+												<Select.Trigger aria-label="Model" placeholder="Model" style={{ width: "100%" }} />
+												<Select.Content position="popper">
+													{probe.models.map((m) => (
+														<Select.Item key={m.id} value={m.id}>
+															{m.id}
+															{m.decision ? " · decision model" : ""}
+														</Select.Item>
+													))}
+												</Select.Content>
+											</Select.Root>
+										) : (
+											editing === OTHER && <TextField.Root placeholder="Model, as the service names it (e.g. Tev1-4B-openjev)" value={model} onChange={(e) => setModel(e.target.value)} aria-label="Model" />
+										)}
+										<Flex gap="2" align="center">
+											<TextField.Root
+												type="password"
+												placeholder={editing === OTHER ? "API key, if it needs one" : "Paste your TypeSafe key"}
+												value={key}
+												onChange={(e) => setKey(e.target.value)}
+												style={{ flexGrow: 1 }}
+												aria-label="API key"
+											/>
+											{editing === OTHER && (
+												<Button variant="soft" color="gray" size="2" loading={busy} disabled={!baseUrl.trim()} onClick={() => void look(model.trim() || undefined)}>
+													{probe?.models.length ? "Try" : "Find models"}
+												</Button>
+											)}
+											<Button variant="soft" size="2" loading={busy} disabled={editing === OTHER ? !baseUrl.trim() : !key.trim()} onClick={() => void save()}>
+												Save
+											</Button>
+										</Flex>
+										{probe?.error && (
+											<Text size="2" color="red">
+												{probe.error}
+											</Text>
+										)}
+										{probe && !probe.error && !probe.tried && <Text size="2" color="gray">{probe.models.length ? "Pick a model, then Try." : "This service lists no model."}</Text>}
+										{probe?.tried && (
+											<Text size="2" color={probe.tried.ok ? "green" : "red"}>
+												{probe.tried.ok ? `${probe.tried.model} answered in ${probe.tried.ms} ms. Save to use it.` : `${probe.tried.model}: ${probe.tried.error}`}
+											</Text>
+										)}
+									</Flex>
+								)}
+							</Flex>
+						</Disclosure>
+					)}
+					{error && (
+						<Callout.Root color="red" size="1" role="alert">
+							<Callout.Icon>
+								<Icon name="alert" />
+							</Callout.Icon>
+							<Callout.Text>{error}</Callout.Text>
+						</Callout.Root>
+					)}
+				</Flex>
+			</Card>
+		</section>
+	);
+}
 
 /**
  * Search by meaning: some sites search their own pages with a model on

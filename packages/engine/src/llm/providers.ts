@@ -146,6 +146,12 @@ function slug(name: string): string {
 
 // ── Discovery ───────────────────────────────────────────────────────────
 
+/** A service on this computer (LM Studio, Ollama, oMLX…): data given to it never leaves the machine. */
+export function isLocal(provider: LlmProvider): boolean {
+	const host = new URL(provider.baseUrl).hostname;
+	return host === "127.0.0.1" || host === "localhost" || host === "[::1]";
+}
+
 export function authHeaders(provider: LlmProvider): Record<string, string> {
 	return provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {};
 }

@@ -26,6 +26,8 @@ export interface Detection {
 	agent?: string;
 	/** The embedding model this site would get (connected sites only), if the visitor has one. */
 	embed?: string;
+	/** The decision model the site gets, when the visitor set a key. */
+	decide?: string;
 }
 
 export type BridgeEvent =
@@ -93,6 +95,8 @@ export interface SiteNeeds {
 	effort?: "light" | "standard" | "deep";
 	/** About how much text one turn sends, in tokens. */
 	context?: number;
+	/** The site's features ask a decision model typed questions (`ai.decide()`). */
+	decide?: boolean;
 }
 
 export interface BridgeClientOptions {
@@ -165,6 +169,7 @@ function needsQuery(needs: SiteNeeds | undefined): Record<string, string> {
 	return {
 		...(needs.tools ? { tools: "1" } : {}),
 		...(needs.images ? { images: "1" } : {}),
+		...(needs.decide ? { decide: "1" } : {}),
 		...(needs.effort ? { effort: needs.effort } : {}),
 		...(needs.context ? { context: String(needs.context) } : {}),
 	};
@@ -231,6 +236,7 @@ export class BridgeClient {
 			agent?: string;
 			paired?: boolean;
 			embed?: string;
+			decide?: string;
 		};
 		if (!body.leuria) return { status: "offline" };
 		// `paired` is only reported to web pages; without an Origin
@@ -242,6 +248,7 @@ export class BridgeClient {
 			version: body.leuria,
 			agent: body.agent,
 			...(paired && body.embed ? { embed: body.embed } : {}),
+			...(paired && body.decide ? { decide: body.decide } : {}),
 		};
 	}
 
@@ -365,6 +372,11 @@ export class BridgeClient {
 	/** Embed texts with the visitor's embedding model (see `Detection.embed`). */
 	embed(texts: string[], kind: "query" | "document", signal?: AbortSignal): Promise<{ model: string; vectors: number[][] }> {
 		return this.post("/embed", { texts, kind }, { signal });
+	}
+
+	/** Answer typed questions with the visitor's decision model (see `Detection.decide`). */
+	decide<T>(body: { state: unknown; questions: unknown; model?: string }, signal?: AbortSignal): Promise<T> {
+		return this.post("/decide", body, { signal });
 	}
 
 	async post<T = unknown>(path: string, body: unknown, init: RequestInit = {}): Promise<T> {

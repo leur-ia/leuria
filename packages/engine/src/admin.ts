@@ -27,6 +27,10 @@
  *   POST   /admin/test  { agent? }    real round trip with an AI, the default one without `agent` (`leuria test`)
  *   GET    /admin/embeddings          embedding models on this computer, the choice, and the one sites get now
  *   POST   /admin/embeddings { choice: "auto" | "off" | { provider, model } } the embedding model sites get
+ *   GET    /admin/decisions           decision models on this computer, the choice, and the one sites get now
+ *   POST   /admin/decisions { choice: "auto" | "off" | { provider, model } | { baseUrl?, apiKey?, model? } } the decision model sites get (a service is tested first)
+ *   POST   /admin/sites/decide { origin, choice|null } the decision model one site gets (null: the one every site gets)
+ *   POST   /admin/decisions/probe { baseUrl?, apiKey?, model? } look at a decision service: its models, and a real question to one
  */
 
 import type * as http from "node:http";
@@ -39,7 +43,8 @@ import { parseNeeds, type SiteNeeds } from "./needs.js";
 import { detectInstalledClis } from "./detect.js";
 import type { GrantStore } from "./grants.js";
 import { addAi, providerInUse, removeAi, yourAis } from "./ais.js";
-import { type EmbedChoice, type EngineConfig, isKnownReady, loadConfig, saveConfig } from "./home.js";
+import { type DecideChoice, type EmbedChoice, type EngineConfig, isKnownReady, loadConfig, saveConfig } from "./home.js";
+import { askSystemOne, decisionBaseUrl, DEFAULT_DECISION_URL, listLocalDeciders, probeService, systemOneDecisions } from "./llm/decisions.js";
 import { listLocalEmbedders, localEmbeddings } from "./llm/embeddings.js";
 import { parseBody, sendJson } from "./http-utils.js";
 import type { Logger } from "./logger.js";
@@ -323,7 +328,8 @@ export function createAdminHandler(ctx: AdminContext) {
 			return true;
 		}
 		if (route === "GET /sites") {
-			sendJson(res, 200, { sites: ctx.grants.list().map(({ tokenHash: _hash, ...site }) => site) });
+			// A site's decision service shows without its key.
+			sendJson(res, 200, { sites: ctx.grants.list().map(({ tokenHash: _hash, decide, ...site }) => ({ ...site, ...(decide ? { decide: decideChoiceInfo(decide) } : {}) })) });
 			return true;
 		}
 		if (route === "POST /sites/model") {
@@ -419,6 +425,68 @@ export function createAdminHandler(ctx: AdminContext) {
 			sendJson(res, 200, { choice: embed ?? "auto" });
 			return true;
 		}
+		if (route === "GET /decisions") {
+			const decisions = systemOneDecisions(() => ctx.config.decisions);
+			const [models, current] = await Promise.all([listLocalDeciders(), decisions.find()]);
+			const provider = (p: { id: string; kind: string; name: string }) => ({ id: p.id, kind: p.kind, name: p.name });
+			sendJson(res, 200, {
+				choice: decideChoiceInfo(ctx.config.decisions),
+				current: current ? { model: current.model, name: current.name, local: current.local, ...(current.provider ? { provider: provider(current.provider) } : {}) } : null,
+				models: models.map((m) => ({ provider: provider(m.provider), model: m.model.id, loaded: m.model.loaded ?? null })),
+			});
+			return true;
+		}
+		if (route === "POST /decisions/probe") {
+			const { baseUrl, apiKey, model } = (await parseBody(req)) as { baseUrl?: unknown; apiKey?: unknown; model?: unknown };
+			if ((baseUrl !== undefined && typeof baseUrl !== "string") || (apiKey !== undefined && typeof apiKey !== "string") || (model !== undefined && typeof model !== "string")) {
+				sendJson(res, 400, { error: "baseUrl, apiKey and model must be strings" });
+				return true;
+			}
+			let service: { baseUrl: string; apiKey?: string; model?: string };
+			try {
+				service = { baseUrl: baseUrl?.trim() ? decisionBaseUrl(baseUrl) : DEFAULT_DECISION_URL, ...(apiKey?.trim() ? { apiKey: apiKey.trim() } : {}), ...(model?.trim() ? { model: model.trim() } : {}) };
+			} catch {
+				sendJson(res, 400, { error: "That address doesn't look right. Try something like http://localhost:8000/v1." });
+				return true;
+			}
+			try {
+				sendJson(res, 200, await probeService(service));
+			} catch (error) {
+				sendJson(res, 422, { error: error instanceof Error ? error.message : String(error) });
+			}
+			return true;
+		}
+		if (route === "POST /decisions") {
+			const { choice } = (await parseBody(req)) as { choice?: unknown };
+			const read = await readDecideChoice(choice);
+			if ("error" in read) {
+				sendJson(res, read.status, { error: read.error });
+				return true;
+			}
+			if (read.choice) ctx.config.decisions = read.choice;
+			else delete ctx.config.decisions;
+			const { decisions: _previous, ...saved } = loadConfig();
+			saveConfig(read.choice ? { ...saved, decisions: read.choice } : saved);
+			ctx.emit({ event: "decisions", choice: decideChoiceInfo(read.choice) });
+			sendJson(res, 200, { choice: decideChoiceInfo(read.choice) });
+			return true;
+		}
+		if (route === "POST /sites/decide") {
+			const body = (await parseBody(req)) as { origin?: unknown; choice?: unknown };
+			if (typeof body.origin !== "string" || !ctx.grants.get(body.origin)) {
+				sendJson(res, 404, { error: "This site is not connected" });
+				return true;
+			}
+			// `null`: the site follows the choice every site gets.
+			const read = body.choice === null ? { choice: undefined } : await readDecideChoice(body.choice);
+			if ("error" in read) {
+				sendJson(res, read.status, { error: read.error });
+				return true;
+			}
+			ctx.grants.setDecide(body.origin, read.choice);
+			sendJson(res, 200, { origin: body.origin, choice: read.choice ? decideChoiceInfo(read.choice) : null });
+			return true;
+		}
 		if (route === "POST /test") {
 			const body = (await parseBody(req).catch(() => ({}))) as { agent?: unknown };
 			const agent = typeof body.agent === "string" && body.agent ? body.agent : ctx.config.agent;
@@ -494,4 +562,43 @@ async function fitAis(ctx: AdminContext, needs: SiteNeeds | undefined) {
 			: null,
 		ais,
 	};
+}
+
+/**
+ * A decision choice from the app: `"auto"` (nothing chosen), `"off"`, a
+ * model on this computer, or a service, which is tried before it is kept.
+ */
+async function readDecideChoice(choice: unknown): Promise<{ choice: DecideChoice | undefined } | { error: string; status: number }> {
+	const { provider, model, baseUrl, apiKey } = (choice ?? {}) as { provider?: unknown; model?: unknown; baseUrl?: unknown; apiKey?: unknown };
+	if (choice === "auto") return { choice: undefined };
+	if (choice === "off") return { choice: "off" };
+	if (typeof provider === "string" && provider && typeof model === "string" && model) return { choice: { provider, model } };
+	if (baseUrl === undefined && apiKey === undefined) return { error: 'choice must be "auto", "off", { provider, model } or { baseUrl?, apiKey?, model? }', status: 400 };
+	if ((baseUrl !== undefined && typeof baseUrl !== "string") || (apiKey !== undefined && typeof apiKey !== "string") || (model !== undefined && typeof model !== "string")) {
+		return { error: 'choice must be "auto", "off", { provider, model } or { baseUrl?, apiKey?, model? }', status: 400 };
+	}
+	let service: { baseUrl: string; apiKey?: string; model?: string };
+	try {
+		service = {
+			baseUrl: baseUrl?.trim() ? decisionBaseUrl(baseUrl) : DEFAULT_DECISION_URL,
+			...(apiKey?.trim() ? { apiKey: apiKey.trim() } : {}),
+			...(model?.trim() ? { model: model.trim() } : {}),
+		};
+	} catch {
+		return { error: "That address doesn't look right. Try something like http://localhost:8000/v1.", status: 400 };
+	}
+	// Test before saving: the visitor learns at once if the address, key or model is wrong.
+	try {
+		await askSystemOne(service, { state: "ok", questions: { works: { type: "noul", instructions: "Is the state the word ok?" } }, model: service.model }, undefined, 30_000);
+	} catch (error) {
+		return { error: error instanceof Error ? error.message : String(error), status: 422 };
+	}
+	return { choice: service };
+}
+
+/** The visitor's choice as the desktop app sees it: a service without its key. */
+function decideChoiceInfo(choice: DecideChoice | undefined): "auto" | "off" | { provider: string; model: string } | { baseUrl: string; hasKey: boolean; model?: string } {
+	if (!choice) return "auto";
+	if (choice === "off" || "provider" in choice) return choice;
+	return { baseUrl: choice.baseUrl, hasKey: Boolean(choice.apiKey), ...(choice.model ? { model: choice.model } : {}) };
 }

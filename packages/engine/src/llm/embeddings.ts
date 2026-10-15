@@ -7,7 +7,7 @@
  */
 
 import { type EmbedChoice, loadConfig } from "../home.js";
-import { authHeaders, EMBEDDING, type LlmProvider, listProviders } from "./providers.js";
+import { authHeaders, EMBEDDING, isLocal, type LlmProvider, listProviders } from "./providers.js";
 
 export interface Embedder {
 	provider: LlmProvider;
@@ -25,12 +25,6 @@ export class NoEmbedderError extends Error {
 		super("No embedding model on this computer. Load one in LM Studio or Ollama.");
 		this.name = "NoEmbedderError";
 	}
-}
-
-function isLocal(provider: LlmProvider): boolean {
-	if (provider.kind !== "lmstudio" && provider.kind !== "ollama") return false;
-	const host = new URL(provider.baseUrl).hostname;
-	return host === "127.0.0.1" || host === "localhost" || host === "[::1]";
 }
 
 interface EmbeddingModel {

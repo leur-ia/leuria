@@ -25,6 +25,8 @@ import type { ChatRun } from "./run.js";
 import type {
 	Capability,
 	ChatEvent,
+	DecideQuestion,
+	DecideResult,
 	EmbedResult,
 	MessageInput,
 	Provider,
@@ -92,6 +94,10 @@ export interface LeuriaState {
 	embedder?: ProviderInfo & { model: string };
 	/** Like `pending`, for embeddings: an embedder ahead of the current one that needs a visitor action. */
 	embedPending?: ProviderSnapshot;
+	/** The provider and model `decide()` would use now. */
+	decider?: ProviderInfo & { model: string };
+	/** Like `pending`, for decisions. */
+	decidePending?: ProviderSnapshot;
 	/**
 	 * Chat providers waiting for the visitor to pick them instead of their
 	 * own AI (see `fallback`), in order: ready ones, and ones a click would
@@ -119,6 +125,16 @@ export interface EmbedOptions {
 export interface EmbedResponse extends EmbedResult {
 	provider: ProviderInfo;
 }
+
+export interface DecideOptions {
+	/** A model of the service; its latest by default. */
+	model?: string;
+	/** Only this provider (or these, in order). */
+	provider?: string | string[];
+	signal?: AbortSignal;
+}
+
+export type DecideResponse<Q extends Record<string, DecideQuestion>> = DecideResult<Q> & { provider: ProviderInfo };
 
 const offersOf = (p: Provider): readonly Service[] => p.offers ?? ["chat"];
 
@@ -308,6 +324,29 @@ export class Leuria {
 		throw new NoProviderError(["embed"], reasons);
 	}
 
+	/**
+	 * Answer typed questions about `state` (a choice, a score, a yes/no
+	 * probability) with the first ready provider that can: a System One
+	 * model, which decides without writing text, in well under a second.
+	 * The visitor's own service, through Leuria, with their key.
+	 */
+	async decide<const Q extends Record<string, DecideQuestion>>(state: unknown, questions: Q, options: DecideOptions = {}): Promise<DecideResponse<Q>> {
+		const reasons: NoProviderError["reasons"] = [];
+		for (const provider of this.candidates("decide", options.provider)) {
+			const state_ = provider.getState();
+			let reason: string | null = null;
+			if (state_.status !== "ready") reason = state_.detail ?? state_.status;
+			else if (!provider.decide || !state_.capabilities.includes("decide")) reason = "cannot decide";
+			if (reason) {
+				reasons.push({ id: provider.id, label: provider.label, state: state_, reason });
+				continue;
+			}
+			const result = (await provider.decide!({ state, questions, model: options.model, signal: options.signal })) as DecideResult<Q>;
+			return { ...result, provider: { id: provider.id, label: provider.label, locality: provider.locality } };
+		}
+		throw new NoProviderError(["decide"], reasons);
+	}
+
 	/** A multi-turn conversation that keeps its history and follows the cascade. */
 	conversation<T = unknown>(options: ConversationOptions<T> = {}): Conversation<T> {
 		const conversation = new Conversation<T>(this.select, options, this.hooks);
@@ -380,6 +419,7 @@ export class Leuria {
 		};
 		const chat = pick("chat", (p) => p.status === "ready" && !waiting.has(p.id));
 		const embed = pick("embed", (p) => p.status === "ready" && p.capabilities.includes("embed") && Boolean(p.embedModel));
+		const decide = pick("decide", (p) => p.status === "ready" && p.capabilities.includes("decide") && Boolean(p.decideModel));
 		const info = (p: ProviderSnapshot): ProviderInfo => ({ id: p.id, label: p.label, locality: p.locality });
 		return {
 			providers,
@@ -387,6 +427,8 @@ export class Leuria {
 			pending: chat.pending,
 			embedder: embed.found ? { ...info(embed.found), model: embed.found.embedModel! } : undefined,
 			embedPending: embed.pending,
+			decider: decide.found ? { ...info(decide.found), model: decide.found.decideModel! } : undefined,
+			decidePending: decide.pending,
 			alternatives: providers.filter((p) => waiting.has(p.id) && (p.status === "ready" || (p.status === "needs-action" && p.action === "download"))),
 			needs: [...new Set([...(this.conversations ?? [])].flatMap((c) => c.needs))],
 		};

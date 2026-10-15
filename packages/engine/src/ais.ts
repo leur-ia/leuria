@@ -39,7 +39,12 @@ export function removeAi(id: string): void {
 export function providerInUse(providerId: string, defaultAgent: string): boolean {
 	const config = loadConfig();
 	const uses = (id: string) => parseLlmId(id)?.providerId === providerId;
-	return uses(defaultAgent) || (config.ais ?? []).some(uses) || (typeof config.embed === "object" && config.embed.provider === providerId);
+	return (
+		uses(defaultAgent) ||
+		(config.ais ?? []).some(uses) ||
+		(typeof config.embed === "object" && config.embed.provider === providerId) ||
+		(typeof config.decisions === "object" && "provider" in config.decisions && config.decisions.provider === providerId)
+	);
 }
 
 /**

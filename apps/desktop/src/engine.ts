@@ -54,6 +54,8 @@ export interface Site {
 	agent?: string;
 	/** The site's own model, for the AI it was chosen with. */
 	model?: { agent: string; id: string };
+	/** The site's own decision model; the one every site gets when absent. */
+	decide?: Exclude<DecideChoice, "auto">;
 	/** What the site said its features need. */
 	needs?: SiteNeeds;
 	/** The skills the site gives its AI. */
@@ -87,6 +89,7 @@ export interface SiteNeeds {
 	images?: boolean;
 	effort?: "light" | "standard" | "deep";
 	context?: number;
+	decide?: boolean;
 }
 
 /** What using a model costs the visitor: nothing (on this computer), their plan's limits, or money per use. */
@@ -134,6 +137,21 @@ export interface SearchModels {
 	/** Every search model found on this computer (LM Studio, Ollama). */
 	models: Array<{ provider: { id: string; kind: string; name: string }; model: string; loaded: boolean | null }>;
 }
+
+/** The decision model sites get: automatic (the first on this computer), one chosen here, a service (its key stays in the engine), or off. */
+export type DecideChoice = "auto" | "off" | { provider: string; model: string } | { baseUrl: string; hasKey: boolean; model?: string };
+
+/** Decisions: sites ask a System One model typed questions, on this computer (Ollama) or at a service the visitor set. */
+export interface DecisionModels {
+	choice: DecideChoice;
+	/** The model sites get now (none when off, or when nothing is found). */
+	current: { model: string; name: string; local: boolean; provider?: { id: string; kind: string; name: string } } | null;
+	/** Every decision model found on this computer. */
+	models: Array<{ provider: { id: string; kind: string; name: string }; model: string; loaded: boolean | null }>;
+}
+
+/** TypeSafe's address: the default decision service. */
+export const TYPESAFE_URL = "https://api.typesafe.ai/v1";
 
 /** "text-embedding-nomic-embed-text-v1.5" → "nomic-embed-text-v1.5". */
 export function searchModelName(model: string): string {
@@ -253,6 +271,16 @@ export const engine = {
 	/** Search models on this computer, and the one sites get. */
 	searchModels: () => call<SearchModels>("GET", "/embeddings"),
 	setSearchModel: (choice: SearchChoice) => call<{ choice: SearchChoice }>("POST", "/embeddings", { choice }),
+	/** Decision models on this computer, and the one sites get. */
+	decisionModels: () => call<DecisionModels>("GET", "/decisions"),
+	/** The decision model one site gets (`null`: the one every site gets). */
+	setSiteDecide: (origin: string, choice: "off" | { provider: string; model: string } | null) => call<{ origin: string }>("POST", "/sites/decide", { origin, choice }),
+	/** Look at a decision service before saving it: its models (decision ones first), and a real question to one. */
+	probeDecisionService: (service: { baseUrl?: string; apiKey?: string; model?: string }) =>
+		call<{ baseUrl: string; models: Array<{ id: string; decision: boolean }>; tried?: { model: string; ok: boolean; ms: number; error?: string } }>("POST", "/decisions/probe", service),
+	/** The decision model sites get; a service (TypeSafe without `baseUrl`) is tested first. */
+	setDecisionModel: (choice: "auto" | "off" | { provider: string; model: string } | { baseUrl?: string; apiKey?: string; model?: string }) =>
+		call<{ choice: DecideChoice }>("POST", "/decisions", { choice }),
 };
 
 /** Engine events relayed by the Rust shell: pairing, pairing-decided, progress, exit… */

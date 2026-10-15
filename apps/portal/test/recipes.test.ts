@@ -9,6 +9,8 @@ import * as client from "@leuria/client";
 import {
 	BaseProvider,
 	createAI,
+	type DecideRequest,
+	type DecideResult,
 	type EmbedRequest,
 	type EmbedResult,
 	type JsonSchema,
@@ -50,13 +52,28 @@ function fake(schema: JsonSchema | undefined): unknown {
 /** Calls each tool once with made-up arguments, then answers; answers schemas with a fitting object. */
 class FakeAI extends BaseProvider {
 	constructor() {
-		super("fake", "A test AI", "device", { status: "ready", capabilities: ["chat", "tools", "structured"], model: "fake", embedModel: "words" });
+		super("fake", "A test AI", "device", { status: "ready", capabilities: ["chat", "tools", "structured", "embed", "decide"], model: "fake", embedModel: "words", decideModel: "coin" });
 	}
-	readonly offers = ["chat", "embed"] as const;
+	readonly offers = ["chat", "embed", "decide"] as const;
 	async detect(): Promise<void> {}
 	async embed({ texts }: EmbedRequest): Promise<EmbedResult> {
 		const words = ["mug", "tea", "glaze", "blue", "price", "order", "search", "tool"];
 		return { model: "words", vectors: texts.map((t) => words.map((w) => (t.toLowerCase().split(w).length - 1) + 0.01)) };
+	}
+	/** Every question gets its first option, its first level, or a yes. */
+	async decide({ questions }: DecideRequest): Promise<DecideResult> {
+		const answers = Object.fromEntries(
+			Object.entries(questions).map(([id, q]) => {
+				if (q.type === "noul") return [id, { type: "noul", noul: 1 }];
+				if (q.type === "choice") {
+					const first = Object.keys(q.criteria)[0]!;
+					return [id, { type: "choice", choice: first, probabilities: Object.fromEntries(Object.keys(q.criteria).map((k) => [k, k === first ? 1 : 0])), confidence: 1 }];
+				}
+				const legend = Object.fromEntries(q.criteria.map((c, i) => [String(i), String(c)]));
+				return [id, { type: "score", score: 0, legend, probabilities: Object.fromEntries(q.criteria.map((_c, i) => [String(i), i === 0 ? 1 : 0])), confidence: 1 }];
+			}),
+		);
+		return { model: "coin", answers };
 	}
 	async createSession(options: SessionOptions): Promise<ProviderSession> {
 		return {

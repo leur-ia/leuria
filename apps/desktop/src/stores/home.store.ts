@@ -1,7 +1,7 @@
 import { createStore } from "@sinuxjs/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 
-import { type AgentModels, engine, errorMessage, onEngine, failureText, type Fit, friendlyName, type SearchChoice, type SearchModels, type SignInStatus, type Site, type TestResult, type YourAi } from "../engine";
+import { type AgentModels, type DecisionModels, engine, EngineOutdated, errorMessage, onEngine, failureText, type Fit, friendlyName, type SearchChoice, type SearchModels, type SignInStatus, type Site, type TestResult, type YourAi } from "../engine";
 import { appStore } from "./app.store";
 
 /** The sidebar's pages. */
@@ -24,6 +24,8 @@ export interface HomeState {
 	aiModels: Record<string, AgentModels | null>;
 	/** Search by meaning: the models on this computer and the one sites get (null until loaded). */
 	search: SearchModels | null;
+	/** Decisions: the models on this computer and the one sites get (null until loaded). */
+	decisions: DecisionModels | null;
 	/** "Refresh models", per AI: running, or whether the AI answered. */
 	modelRefresh: Record<string, "running" | "done" | "stale">;
 	/** A site whose settings a `leuria://site` link asked for: shown open. */
@@ -43,6 +45,7 @@ const initial: HomeState = {
 	signInNeeded: null,
 	aiModels: {},
 	search: null,
+	decisions: null,
 	modelRefresh: {},
 	focus: null,
 	fits: {},
@@ -162,6 +165,16 @@ export const homeStore = createStore(initial, {
 			return { error: failureText(error, "The model didn't change. Try again."), sites: state.sites };
 		}
 	},
+	/** The decision model one site gets, or `null` to follow the one every site gets. */
+	setSiteDecide: async (state, origin: string, choice: "off" | { provider: string; model: string } | null) => {
+		try {
+			await engine.setSiteDecide(origin, choice);
+			return { sites: await engine.sites(), error: "" };
+		} catch (error) {
+			console.warn("Changing the site's decision model failed:", error);
+			return { error: failureText(error, "The decision model didn't change. Try again."), sites: state.sites };
+		}
+	},
 	disconnect: async (_state, origin: string) => {
 		await engine.disconnect(origin);
 		void appStore.refresh();
@@ -221,6 +234,24 @@ export const homeStore = createStore(initial, {
 		} catch (error) {
 			console.warn("Changing the search model failed:", error);
 			return { search: state.search, error: failureText(error, "The search model didn't change. Try again.") };
+		}
+	},
+	/** Look for decision models (asks Ollama and LM Studio, starts nothing). */
+	loadDecisions: async () => {
+		try {
+			return { decisions: await engine.decisionModels() };
+		} catch (error) {
+			console.warn("Listing decision models failed:", error);
+			return { decisions: { choice: "auto" as const, current: null, models: [] } };
+		}
+	},
+	setDecisions: async (state, choice: Parameters<typeof engine.setDecisionModel>[0]) => {
+		try {
+			await engine.setDecisionModel(choice);
+			return { decisions: await engine.decisionModels(), error: "" };
+		} catch (error) {
+			console.warn("Changing the decision model failed:", error);
+			return { decisions: state.decisions, error: error instanceof EngineOutdated ? error.message : `The decision model didn't change: ${errorMessage(error)}` };
 		}
 	},
 	toggleAutostart: async (state) => {

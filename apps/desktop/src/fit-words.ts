@@ -9,7 +9,7 @@ import type { Cost, Fit, SiteNeeds, Verdict } from "./engine";
 export function needsSentence(needs: SiteNeeds | null | undefined): string {
 	if (!needs) return "";
 	const tasks = needs.effort === "light" ? "quick tasks" : needs.effort === "standard" ? "everyday tasks" : needs.effort === "deep" ? "hard, long tasks" : "its tasks";
-	const withWhat = [needs.tools ? "its own tools" : "", needs.images ? "images" : ""].filter(Boolean).join(" and ");
+	const withWhat = [needs.tools ? "its own tools" : "", needs.images ? "images" : "", needs.decide ? "a decision model" : ""].filter(Boolean).join(" and ");
 	const long = needs.context && needs.context > 32_000 ? " on long texts" : "";
 	return `This site does ${tasks}${withWhat ? ` with ${withWhat}` : ""}${long}.`;
 }

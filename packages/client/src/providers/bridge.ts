@@ -14,7 +14,7 @@ import {
 } from "../bridge/transport.js";
 import { AbortError } from "../errors.js";
 import { fileText, messageFiles, messageText, parseDataUrl, transcript } from "../messages.js";
-import type { EmbedRequest, EmbedResult, Message, ProviderSession, SessionOptions, TurnContext } from "../types.js";
+import type { DecideRequest, DecideResult, EmbedRequest, EmbedResult, Message, ProviderSession, SessionOptions, TurnContext } from "../types.js";
 import { BaseProvider } from "./base.js";
 
 export interface BridgeProviderOptions extends BridgeClientOptions {
@@ -30,7 +30,7 @@ const EMBED_BATCH = 256;
 
 export class BridgeProvider extends BaseProvider {
 	readonly client: BridgeClient;
-	readonly offers = ["chat", "embed"] as const;
+	readonly offers = ["chat", "embed", "decide"] as const;
 	/** The visitor's own AI: proposed first (see `LeuriaOptions.fallback`). */
 	readonly asksFirst = true;
 	/** The last connect got no answer from Leuria (yet): say it isn't running until it does. */
@@ -43,9 +43,9 @@ export class BridgeProvider extends BaseProvider {
 	}
 
 	async detect(): Promise<void> {
-		const { status, agent, embed } = await this.client.detect();
+		const { status, agent, embed, decide } = await this.client.detect();
 		if (status === "offline" || (status === "unpaired" && this.unreached)) {
-			this.setState({ status: "unavailable", capabilities: [], model: undefined, embedModel: undefined, action: undefined, detail: "Leuria is not running" });
+			this.setState({ status: "unavailable", capabilities: [], model: undefined, embedModel: undefined, decideModel: undefined, action: undefined, detail: "Leuria is not running" });
 		} else if (status === "unpaired") {
 			// Maybe Leuria is here, maybe not: only a connect can tell.
 			this.setState({
@@ -54,15 +54,17 @@ export class BridgeProvider extends BaseProvider {
 				capabilities: [...CAPABILITIES],
 				model: undefined,
 				embedModel: undefined,
+				decideModel: undefined,
 				detail: "This site is not connected to Leuria",
 			});
 		} else {
 			this.setState({
 				status: "ready",
 				action: undefined,
-				capabilities: embed ? [...CAPABILITIES, "embed"] : [...CAPABILITIES],
+				capabilities: [...CAPABILITIES, ...(embed ? ["embed" as const] : []), ...(decide ? ["decide" as const] : [])],
 				model: agent,
 				embedModel: embed,
+				decideModel: decide,
 				detail: undefined,
 			});
 		}
@@ -128,6 +130,16 @@ export class BridgeProvider extends BaseProvider {
 			throw error;
 		}
 		return { vectors, model };
+	}
+
+	async decide({ signal, ...request }: DecideRequest): Promise<DecideResult> {
+		try {
+			return await this.client.decide<DecideResult>(request, signal);
+		} catch (error) {
+			// The key may be gone, or the site disconnected: look again.
+			void this.detect();
+			throw error;
+		}
 	}
 
 	async createSession(options: SessionOptions): Promise<ProviderSession> {

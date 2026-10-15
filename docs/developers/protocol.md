@@ -101,8 +101,9 @@ This covers every route, `/health` and preflight requests included. The CLI engi
 | `404` | | Unknown route, unknown pairing request, or a session this origin doesn't own |
 | `410` | | The pairing request expired before the visitor decided |
 | `429` | | Too many pending pairing requests (20), or the visitor said no to this site less than 30 s ago |
-| `502` | | The local embedding service failed |
+| `502` | | The local embedding service failed, or the decision service couldn't be reached (or refused the visitor's key) |
 | `503` | `no_embedder` | No local embedding model is available |
+| `503` | `no_decider` | No decision model is available (none on this computer, no service set) |
 | `500` | | Unexpected engine error |
 
 ## Health
@@ -110,7 +111,7 @@ This covers every route, `/health` and preflight requests included. The CLI engi
 `GET /health`. A connected page sends its token; local callers need none. With the desktop app, a page it doesn't know gets no answer (see [Silence](#silence)), so a page with no token has nothing to ask: it learns whether Leuria is there by connecting.
 
 ```json
-{ "leuria": "0.1.0", "ok": true, "agent": "Claude · Sonnet 5", "approvals": "app", "paired": true, "embed": "text-embedding-nomic-embed-text-v1.5" }
+{ "leuria": "0.1.0", "ok": true, "agent": "Claude · Sonnet 5", "approvals": "app", "paired": true, "embed": "text-embedding-nomic-embed-text-v1.5", "decide": "jev-latest" }
 ```
 
 | Field | Meaning |
@@ -121,6 +122,7 @@ This covers every route, `/health` and preflight requests included. The CLI engi
 | `approvals` | Where the visitor answers pairing requests: `app` (the desktop app's own window) or `page` (the CLI's approval page, which the engine opens in the browser). Informational: the pairing flow is the same |
 | `paired` | Web pages only: `true` when the bearer token sent with this request is valid |
 | `embed` | The embedding model a connected page would get (see [Embeddings](#embeddings)). Absent for pages that aren't connected, and when there is no model |
+| `decide` | The decision model a connected page would get (see [Decisions](#decisions)). Absent for pages that aren't connected, and when there is none |
 
 ## Pairing
 
@@ -128,7 +130,7 @@ Pairing gives a page a grant: a token that works only for its origin. It starts 
 
 | Step | Who | What |
 | --- | --- | --- |
-| 1. Link | The page, in the click handler | Make a secret `nonce` (16 to 96 random bytes, base64url), then open `leuria://connect?origin=<page origin>&app=<name>&nonce=<nonce>`, plus the site's needs if it declares them (`&tools=1&images=1&effort=light&context=8000`) and one `&skill=<ref>` per skill it uses. The system hands the link to the Leuria app, and starts it if needed |
+| 1. Link | The page, in the click handler | Make a secret `nonce` (16 to 96 random bytes, base64url), then open `leuria://connect?origin=<page origin>&app=<name>&nonce=<nonce>`, plus the site's needs if it declares them (`&tools=1&images=1&decide=1&effort=light&context=8000`) and one `&skill=<ref>` per skill it uses. The system hands the link to the Leuria app, and starts it if needed |
 | 2. Ask | The app | Registers the link with the engine (`POST /admin/pairing/link { origin, app?, nonce, needs?, skills? }`, admin token) and asks the visitor in its own window. From now on, the engine answers this origin |
 | 3. Claim | The page | `POST /connect/claim { nonce, app?, needs?, skills? }`, long-polled for up to 25 s; call it again after `pending` |
 | 4. Answer | The engine | `200 { status: "pending" }`, `{ status: "denied" }`, or `{ status: "allowed", token }` |
@@ -139,7 +141,7 @@ Pairing gives a page a grant: a token that works only for its origin. It starts 
 - **After a No**, the same origin can't ask again for 30 seconds: its claims and links get `429`.
 - The token is returned once. The request is then forgotten.
 - The engine stores only the token's SHA-256, in `~/.leuria/grants.json`. Pairing again replaces the token. The site keeps its AI and model choice.
-- **Needs** are a closed vocabulary: `tools` and `images` (flags), `effort` (`light`, `standard` or `deep`) and `context` (tokens). Unknown keys and values are dropped. They are guidance for the visitor's choice of AI and model, stored with the grant, and never change what the site may do.
+- **Needs** are a closed vocabulary: `tools`, `images` and `decide` (flags), `effort` (`light`, `standard` or `deep`) and `context` (tokens). Unknown keys and values are dropped. They are guidance for the visitor's choice of AI and model, stored with the grant, and never change what the site may do.
 - **Skills** are refs in the `npx skills` syntax (see the [Skills guide](guides/skills.md)): up to 16 strings of at most 300 characters. The engine fetches them while the visitor looks at the question, shows them there, and stores them with the grant.
 - A request expires after 5 minutes. At most 20 can be pending at once, across all sites. `app` is cut to 80 characters.
 - The visitor can revoke a grant at any time (`leuria sites revoke <origin>`, or the desktop app). This ends the origin's sessions, and its token stops working.
@@ -287,6 +289,14 @@ The page's tools run in the page. The engine relays the AI's calls to them over 
 - At most 256 texts per request, each cut to 8,000 characters. Malformed requests get `400`.
 - No local embedding model: `503 { error, code: "no_embedder" }`. The local service failed: `502`.
 - Vectors from different models can't be compared. Keep `model` with them, and rebuild when it changes. `GET /health` names the current model in `embed`.
+
+## Decisions
+
+`POST /decide` `{ state, questions, model? }` returns `{ model, answers, usage? }`. It needs the grant token. The body and the answer are [System One's](https://typesafe.ai/docs) own shapes, passed through to `<baseUrl>/systemone` of the model the visitor uses: a decision model in Ollama or LM Studio on their computer (the first found, or the one they chose; `model` from the page is then replaced by it), or a service they set up: TypeSafe (`https://api.typesafe.ai/v1`, with their key), where `model` from the page is honoured and defaults to `jev-latest`, or any compatible one at its own address (oMLX, a company's), with the model the visitor named.
+
+- `state`: a string, an object or an array (at most 100,000 characters as JSON). `questions`: 1 to 50 of `{ type: "noul" | "choice" | "score", instructions, criteria? }`, by id. Malformed requests get `400`, before anything is sent.
+- No decision model: `503 { error, code: "no_decider" }`. The service refused the request (a question it can't take): `400` with its message. The service refused the key, or couldn't be reached: `502`.
+- Whether the request leaves the visitor's computer depends on their choice (a local model, or a service). `GET /health` names the model in `decide` when there is one.
 
 ## Conformance
 

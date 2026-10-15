@@ -163,6 +163,22 @@ describe("admin API", () => {
 		expect(unknown.status).toBe(404);
 	});
 
+	it("gives a site its own decision model, kept across pairings, shown without a key", async () => {
+		const site = "https://decide.example";
+		grants.create(site);
+		const res = await admin("/sites/decide", { method: "POST", body: JSON.stringify({ origin: site, choice: { provider: "ollama", model: "nimble" } }) });
+		expect(await res.json()).toEqual({ origin: site, choice: { provider: "ollama", model: "nimble" } });
+		grants.create(site);
+		expect(grants.get(site)?.decide).toEqual({ provider: "ollama", model: "nimble" });
+		const { sites } = (await (await admin("/sites")).json()) as { sites: Array<{ origin: string; decide?: unknown }> };
+		expect(sites.find((s) => s.origin === site)?.decide).toEqual({ provider: "ollama", model: "nimble" });
+		await admin("/sites/decide", { method: "POST", body: JSON.stringify({ origin: site, choice: "off" }) });
+		expect(grants.get(site)?.decide).toBe("off");
+		await admin("/sites/decide", { method: "POST", body: JSON.stringify({ origin: site, choice: null }) });
+		expect(grants.get(site)?.decide).toBeUndefined();
+		expect((await admin("/sites/decide", { method: "POST", body: JSON.stringify({ origin: "https://nope.example", choice: "off" }) })).status).toBe(404);
+	});
+
 	it("keeps Your AIs: add, list with the default first, remove (never the default)", async () => {
 		// Service models need no install: LM Studio is known without setup.
 		const qwen = "llm:lmstudio/qwen3-8b";

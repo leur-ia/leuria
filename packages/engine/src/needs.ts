@@ -16,6 +16,8 @@ export interface SiteNeeds {
 	effort?: Effort;
 	/** About how much text one turn sends, in tokens. */
 	context?: number;
+	/** The site's features ask a decision model typed questions (`ai.decide()`). */
+	decide?: boolean;
 }
 
 const EFFORTS: readonly Effort[] = ["light", "standard", "deep"];
@@ -28,6 +30,7 @@ export function parseNeeds(input: unknown): SiteNeeds | undefined {
 	const flag = (value: unknown) => value === true || value === "1" || value === "true";
 	if (flag(raw.tools)) needs.tools = true;
 	if (flag(raw.images)) needs.images = true;
+	if (flag(raw.decide)) needs.decide = true;
 	if (typeof raw.effort === "string" && (EFFORTS as readonly string[]).includes(raw.effort)) needs.effort = raw.effort as Effort;
 	const context = Number(raw.context);
 	if (Number.isFinite(context) && context > 0) needs.context = Math.min(Math.round(context), 10_000_000);

@@ -27,14 +27,15 @@ const ai = createAI({ providers: [leuria(), new MyProvider(), promptAPI()] })
 Implement `Provider`, or extend `BaseProvider`, which keeps the state and notifies changes: implement `detect()` and `createSession()`, and call `setState(patch)`.
 
 - `id`, `label` and `locality` (`device`, `visitor-cloud` or `site`). Ids are unique in a client.
-- `getState()` returns `{ status, capabilities, model?, action?, progress?, detail?, embedModel? }`; `onChange(listener)` notifies changes. The core reads the state again after each change.
+- `getState()` returns `{ status, capabilities, model?, action?, progress?, detail?, embedModel?, decideModel? }`; `onChange(listener)` notifies changes. The core reads the state again after each change.
 - `detect()` checks availability. Keep it cheap: it runs at creation, on focus and every few seconds while the page is visible.
 - `connect()` (optional) resolves `needs-action`: pair, start a download… It is called from a click. Set `action` to `connect` or `download` so the UI can say what a click does.
 - `disconnect()` (optional) forgets the visitor's grant in this browser.
-- `offers` (optional): `["chat"]` by default; `["embed"]` for an embedder only, `["chat", "embed"]` for both.
+- `offers` (optional): `["chat"]` by default; `["embed"]` for an embedder only, `["chat", "embed", "decide"]` for all three.
 - `embed({ texts, kind, signal })` (for `embed`): returns `{ vectors, model }`, one vector per text. Set `capabilities` to include `embed` and `embedModel` to the model's name when ready.
+- `decide({ state, questions, model?, signal })` (for `decide`): returns `{ model, answers }` in System One's shapes (see [Decisions](decisions.md)). Set `capabilities` to include `decide` and `decideModel` when ready.
 
-Capabilities decide what the cascade sends it: `chat`, `tools`, `structured` (native schemas), `agent`, `images`, `embed` (see [Providers](providers.md#the-cascade)).
+Capabilities decide what the cascade sends it: `chat`, `tools`, `structured` (native schemas), `agent`, `images`, `embed`, `decide` (see [Providers](providers.md#the-cascade)).
 
 ## The session
 

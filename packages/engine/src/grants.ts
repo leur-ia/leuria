@@ -7,7 +7,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { statSync } from "node:fs";
 
-import { homePath, readJson, writeJson } from "./home.js";
+import { type DecideChoice, homePath, readJson, writeJson } from "./home.js";
 import type { SiteNeeds } from "./needs.js";
 import type { SiteSkills } from "./skills.js";
 
@@ -22,6 +22,8 @@ interface Grant {
 	agent?: string;
 	/** The model this site uses, for the AI it was chosen with; that AI's model choice otherwise. */
 	model?: { agent: string; id: string };
+	/** The decision model this site gets, when the visitor chose one for it; the one every site gets otherwise. */
+	decide?: DecideChoice;
 	/** What the site said its features need, when it connected (guidance for choosing its AI). */
 	needs?: SiteNeeds;
 	/** The skills the site gives its AI: the refs it declared and what they resolved to. */
@@ -85,6 +87,18 @@ export class GrantStore {
 		});
 	}
 
+	/** The decision model for this site, or the one every site gets when `undefined`. Open conversations are unaffected. */
+	setDecide(origin: string, choice: DecideChoice | undefined): boolean {
+		return this.update(
+			origin,
+			(g) => {
+				if (choice) g.decide = choice;
+				else delete g.decide;
+			},
+			false,
+		);
+	}
+
 	/** Replace the site's skills (it changed its list). Its open conversations keep the skills they started with. */
 	setSkills(origin: string, skills: SiteSkills | undefined): boolean {
 		return this.update(
@@ -122,6 +136,7 @@ export class GrantStore {
 			createdAt: new Date().toISOString(),
 			...(previous?.agent ? { agent: previous.agent } : {}),
 			...(previous?.model ? { model: previous.model } : {}),
+			...(previous?.decide ? { decide: previous.decide } : {}),
 			...(needs ? { needs } : {}),
 			...(skills ? { skills } : {}),
 		});

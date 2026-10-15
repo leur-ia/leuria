@@ -11,7 +11,8 @@
 import type { ToolDefinition } from "./types.js";
 
 export { createAI, createLeuria, Leuria } from "./leuria.js";
-export type { ChatRequest, EmbedOptions, EmbedResponse, LeuriaOptions, LeuriaState, ProviderSnapshot } from "./leuria.js";
+export type { ChatRequest, DecideOptions, DecideResponse, EmbedOptions, EmbedResponse, LeuriaOptions, LeuriaState, ProviderSnapshot } from "./leuria.js";
+export { choice, noul, score } from "./types.js";
 export { connection } from "./connection.js";
 export { exposeTools, modelContext } from "./webmcp.js";
 export type { Connection, ConnectionState, ConnectStatus } from "./connection.js";

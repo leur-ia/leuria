@@ -35,9 +35,25 @@ export interface EngineConfig {
 	 * or `off` (sites can't embed). Absent: the first one found on this computer.
 	 */
 	embed?: EmbedChoice;
+	/**
+	 * The decision model sites get (`POST /decide`): one the visitor chose on
+	 * this computer, a System One service (TypeSafe with their key, or one at
+	 * its own address), or `off`. Absent: the first model found on this computer.
+	 */
+	decisions?: DecideChoice;
 }
 
 export type EmbedChoice = "off" | { provider: string; model: string };
+export type DecideChoice = "off" | { provider: string; model: string } | { baseUrl: string; apiKey?: string; model?: string };
+
+function parseDecideChoice(value: unknown): DecideChoice | undefined {
+	if (value === "off") return "off";
+	const { provider, model, baseUrl, apiKey } = (value ?? {}) as { provider?: unknown; model?: unknown; baseUrl?: unknown; apiKey?: unknown };
+	if (typeof baseUrl === "string" && baseUrl) {
+		return { baseUrl, ...(typeof apiKey === "string" && apiKey ? { apiKey } : {}), ...(typeof model === "string" && model ? { model } : {}) };
+	}
+	return parseEmbedChoice({ provider, model });
+}
 
 function parseEmbedChoice(value: unknown): EmbedChoice | undefined {
 	if (value === "off") return "off";
@@ -62,6 +78,7 @@ export function loadConfig(): EngineConfig {
 		...(stored.models && typeof stored.models === "object" ? { models: stored.models } : {}),
 		...(stored.ready && typeof stored.ready === "object" ? { ready: stored.ready } : {}),
 		...(parseEmbedChoice(stored.embed) ? { embed: parseEmbedChoice(stored.embed) } : {}),
+		...(parseDecideChoice(stored.decisions) ? { decisions: parseDecideChoice(stored.decisions) } : {}),
 	};
 }
 
