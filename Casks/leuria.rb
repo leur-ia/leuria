@@ -1,9 +1,9 @@
 cask "leuria" do
   arch arm: "apple-silicon", intel: "intel"
 
-  version "0.1.5"
-  sha256 arm:   "7587657f8882467bf524569acadec8185cebaafe07d9d7e46ff3c706b5aa5715",
-         intel: "7eeb15ffb7c05400c2ac99a3b9ba3dd094d2cbbe7a5cc476daba0dd2df5cfd35"
+  version "0.1.6"
+  sha256 arm:   "a50f71a7e5dd5eeeb411e49227e10eebae551e74ae6d3f6096a43a9909d684d7",
+         intel: "d0b4a7b05b9f86fbc5ae7f75c74e569ceb6f0163ba66be11a756ebb210ffa47b"
 
   url "https://github.com/leur-ia/leuria/releases/download/v#{version}/Leuria-mac-#{arch}.dmg"
   name "Leuria"
