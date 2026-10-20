@@ -64,6 +64,8 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 		<Dialog.Root open onOpenChange={(open) => !open && !busy && decide(false)}>
 			<Dialog.Content
 				maxWidth="420px"
+				// Taller than the window: the panel scrolls, never the window behind it.
+				maxHeight="calc(100vh - var(--space-6))"
 				size="3"
 				aria-describedby="consent-can"
 				// Focus the dialog, not a button: no ring suggesting a pre-chosen answer.

@@ -15,9 +15,9 @@
         "label": "main",
         "title": "Leuria",
         "width": 720,
-        "height": 560,
+        "height": 720,
         "minWidth": 600,
-        "minHeight": 440,
+        "minHeight": 520,
         "resizable": true
       }
     ],
