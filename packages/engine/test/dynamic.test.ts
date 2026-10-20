@@ -44,3 +44,27 @@ describe("the first message's weight, from the decision model", () => {
 		expect(await judgeEffort({ prompt: "hi", decisions: failing })).toBeUndefined();
 	});
 });
+
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { inDynamic, setDynamic } from "../src/ais.js";
+
+describe("leaving an AI out", () => {
+	it("survives a reload of the config", () => {
+		const before = process.env.LEURIA_HOME;
+		process.env.LEURIA_HOME = mkdtempSync(join(tmpdir(), "leuria-dyn-"));
+		try {
+			setDynamic("llm:ollama", undefined, false);
+			setDynamic("claude-acp", "haiku", false);
+			expect(inDynamic("llm:ollama", undefined)).toBe(false);
+			expect(inDynamic("claude-acp", "haiku")).toBe(false);
+			expect(inDynamic("claude-acp", "sonnet")).toBe(true);
+			setDynamic("llm:ollama", undefined, true);
+			expect(inDynamic("llm:ollama", undefined)).toBe(true);
+		} finally {
+			if (before === undefined) delete process.env.LEURIA_HOME;
+			else process.env.LEURIA_HOME = before;
+		}
+	});
+});

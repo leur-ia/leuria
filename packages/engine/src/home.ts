@@ -81,6 +81,7 @@ export function loadConfig(): EngineConfig {
 		...(stored.ready && typeof stored.ready === "object" ? { ready: stored.ready } : {}),
 		...(parseEmbedChoice(stored.embed) ? { embed: parseEmbedChoice(stored.embed) } : {}),
 		...(parseDecideChoice(stored.decisions) ? { decisions: parseDecideChoice(stored.decisions) } : {}),
+		...(Array.isArray(stored.dynamicOff) ? { dynamicOff: stored.dynamicOff.filter((k): k is string => typeof k === "string") } : {}),
 	};
 }
 
