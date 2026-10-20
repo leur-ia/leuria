@@ -231,6 +231,10 @@ export const engine = {
 	chooseAgent: (id: string) => call<{ id: string; name: string }>("POST", "/agent", { id }),
 	/** Your AIs: the ones set up, the default first. Nothing is started. */
 	ais: () => call<{ ais: YourAi[] }>("GET", "/ais").then((r) => r.ais),
+	/** AIs and models left out of dynamic selection (`codex-acp`, `llm:lmstudio@qwen3-8b`). */
+	dynamicOff: () => call<{ off: string[] }>("GET", "/dynamic").then((r) => r.off),
+	/** Put one of Your AIs, or one of its models, in or out of dynamic selection. */
+	setDynamic: (id: string, model: string | null, on: boolean) => call<{ off: string[] }>("POST", "/dynamic", { id, model, on }).then((r) => r.off),
 	/** Set up another AI (installs an agent) without changing the default. */
 	addAi: (id: string) => call<{ id: string; name: string }>("POST", "/ais", { id }),
 	/** Take an AI off Your AIs; its sites go back to the default. */

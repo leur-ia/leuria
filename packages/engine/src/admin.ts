@@ -42,7 +42,7 @@ import { type Cost, fitOf, reasonFor, recommend, type Verdict } from "./fit.js";
 import { parseNeeds, type SiteNeeds } from "./needs.js";
 import { detectInstalledClis } from "./detect.js";
 import type { GrantStore } from "./grants.js";
-import { addAi, dynamicCeiling, isDynamic, providerInUse, removeAi, withinCeiling, yourAiModels, yourAis } from "./ais.js";
+import { addAi, dynamicCeiling, forDynamic, isDynamic, providerInUse, removeAi, setDynamic, yourAiModels, yourAis } from "./ais.js";
 import { type DecideChoice, type EmbedChoice, type EngineConfig, isKnownReady, loadConfig, saveConfig } from "./home.js";
 import { askSystemOne, decisionBaseUrl, DEFAULT_DECISION_URL, listLocalDeciders, probeService, systemOneDecisions } from "./llm/decisions.js";
 import { listLocalEmbedders, localEmbeddings } from "./llm/embeddings.js";
@@ -368,6 +368,21 @@ export function createAdminHandler(ctx: AdminContext) {
 			sendJson(res, 200, { removed: ctx.grants.revoke(origin) });
 			return true;
 		}
+		if (route === "GET /dynamic") {
+			sendJson(res, 200, { off: loadConfig().dynamicOff ?? [] });
+			return true;
+		}
+		if (route === "POST /dynamic") {
+			// Leave one of Your AIs, or one of its models, out of dynamic selection (`on: false`), or put it back.
+			const body = (await parseBody(req)) as { id?: unknown; model?: unknown; on?: unknown };
+			if (typeof body.id !== "string" || !body.id || typeof body.on !== "boolean") {
+				sendJson(res, 400, { error: "id and on are required" });
+				return true;
+			}
+			setDynamic(body.id, typeof body.model === "string" && body.model ? body.model : undefined, body.on);
+			sendJson(res, 200, { off: loadConfig().dynamicOff ?? [] });
+			return true;
+		}
 		if (route === "POST /fit") {
 			// A site's needs: given (a request being approved), or the ones it declared (a connected site).
 			const body = (await parseBody(req)) as { needs?: unknown; origin?: unknown; upTo?: unknown };
@@ -524,7 +539,7 @@ function siteAgents(ctx: AdminContext): string[] {
 async function fitAis(ctx: AdminContext, needs: SiteNeeds | undefined, upTo?: Cost) {
 	const all = await candidates(ctx);
 	// On dynamic selection, the recommendation is what the site would get now: within its ceiling.
-	const best = recommend(needs, upTo ? withinCeiling(all, upTo) : all);
+	const best = recommend(needs, upTo ? forDynamic(all, upTo) : all);
 	const order: Verdict[] = ["fits", "more", "short"];
 	const ais = [...new Set(all.map((c) => c.agent))].map((id) => {
 		const own = all.filter((c) => c.agent === id);

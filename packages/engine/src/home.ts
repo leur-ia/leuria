@@ -22,6 +22,8 @@ export interface EngineConfig {
 	agent: string;
 	/** Your AIs besides the default: agents and service models the visitor set up. */
 	ais?: string[];
+	/** AIs (`codex-acp`) and models (`llm:lmstudio@qwen3-8b`) left out of dynamic selection; everything is in by default. */
+	dynamicOff?: string[];
 	/** The model chosen for each agent (agent id → model id); the agent's default otherwise. */
 	models?: Record<string, string>;
 	/**

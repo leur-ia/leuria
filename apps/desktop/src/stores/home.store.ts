@@ -14,6 +14,8 @@ export interface HomeState {
 	/** Your AIs, the default first: what a site can use. */
 	ais: YourAi[];
 	autostart: boolean;
+	/** AIs and models the visitor left out of dynamic selection. */
+	dynamicOff: string[];
 	/** "Check that it works", per AI (a real question to it). */
 	checks: Record<string, TestResult | "running">;
 	/** A site whose AI is being set up (installed or checked). */
@@ -40,6 +42,7 @@ const initial: HomeState = {
 	sites: [],
 	ais: [],
 	autostart: false,
+	dynamicOff: [],
 	checks: {},
 	settingUp: null,
 	signInNeeded: null,
@@ -78,8 +81,8 @@ export const homeStore = createStore(initial, {
 	},
 	load: async () => {
 		// Your AIs come from Leuria's own list: nothing is searched or started.
-		const [sites, ais, autostart] = await Promise.all([engine.sites(), engine.ais().catch(() => [] as YourAi[]), isEnabled().catch(() => false)]);
-		return { sites, ais, autostart };
+		const [sites, ais, autostart, dynamicOff] = await Promise.all([engine.sites(), engine.ais().catch(() => [] as YourAi[]), isEnabled().catch(() => false), engine.dynamicOff().catch(() => [] as string[])]);
+		return { sites, ais, autostart, dynamicOff };
 	},
 	/** Models of Your AIs (saved ones: an AI is started only if it never listed them). */
 	loadAiModels: async (state) => {
@@ -122,6 +125,15 @@ export const homeStore = createStore(initial, {
 		return { aiModels: { ...homeStore.getState().aiModels, [id]: models }, fits: {} };
 	},
 	/** The model one of Your AIs uses (the default AI's goes through the app store, for the tray). */
+	/** Put an AI (no model) or one of its models in or out of dynamic selection. Sites on it see a new pick next time. */
+	setDynamic: async (state, id: string, model: string | null, on: boolean) => {
+		try {
+			return { dynamicOff: await engine.setDynamic(id, model, on), fits: {}, error: "" };
+		} catch (error) {
+			console.warn("Changing dynamic selection failed:", error);
+			return { dynamicOff: state.dynamicOff, error: failureText(error, "That didn't change. Try again.") };
+		}
+	},
 	setAiModel: async (state, id: string, model: string) => {
 		const before = state.aiModels[id] ?? null;
 		homeStore.updateState({ aiModels: { ...state.aiModels, [id]: before ? { ...before, current: model } : before } });

@@ -9,6 +9,7 @@ import { AiChoiceCard } from "../components/AiChoiceCard";
 import { CeilingSelect, DYNAMIC, DYNAMIC_WORDS, dynamicId, dynamicTitle, isDynamic } from "../components/DynamicSelection";
 import { costWords, needsSentence, verdictOf, verdictWords } from "../fit-words";
 import { Disclosure } from "../components/Disclosure";
+import { DynamicMembership } from "../components/DynamicSelection";
 import { SiteSkills } from "../components/SiteSkills";
 import { type AgentModels, type DecisionModels, describeCheck, engine, errorMessage, TYPESAFE_URL, type Fit, type SearchModels, searchModelName, signInLabel, friendlyName, trayName, type Site, type Status, type TestResult, type YourAi } from "../engine";
 import { appStore } from "../stores/app.store";
@@ -20,7 +21,7 @@ const DEFAULT = "default";
 const SAME_MODEL = "leuria:same-as-ai";
 
 export function Home({ status }: { status: Status }) {
-	const { tab, sites, ais, autostart, checks, modelRefresh, settingUp, signInNeeded, aiModels, search, decisions, focus, fits, error } = useStore(homeStore);
+	const { tab, sites, ais, autostart, dynamicOff, checks, modelRefresh, settingUp, signInNeeded, aiModels, search, decisions, focus, fits, error } = useStore(homeStore);
 	const models = useStore(appStore, (s) => s.models);
 
 	useEffect(() => {
@@ -123,7 +124,7 @@ export function Home({ status }: { status: Status }) {
 											},
 										]
 								).map((ai) => (
-									<AiRow key={ai.id} ai={ai} models={ai.default ? models : (aiModels[ai.id] ?? null)} check={checks[ai.id]} refresh={modelRefresh[ai.id]} />
+									<AiRow key={ai.id} ai={ai} models={ai.default ? models : (aiModels[ai.id] ?? null)} check={checks[ai.id]} refresh={modelRefresh[ai.id]} dynamicOff={dynamicOff} />
 								))}
 								{/* Closes the list: the one way to grow it. */}
 								<div className="ai-row ai-add">
@@ -703,8 +704,11 @@ function AiRow({
 	models,
 	check,
 	refresh,
+	dynamicOff,
 }: {
 	ai: YourAi;
+	/** AIs and models left out of dynamic selection. */
+	dynamicOff: string[];
 	models: AgentModels | null;
 	check?: TestResult | "running";
 	/** "Refresh models": running, or whether the AI answered. */
@@ -764,6 +768,7 @@ function AiRow({
 					<AgentModelSelect models={models} onChange={(id) => void (ai.default ? appStore.setModel(id) : homeStore.setAiModel(ai.id, id))} />
 				</Disclosure>
 			)}
+			<DynamicMembership ai={{ id: ai.id, name }} models={models} off={dynamicOff} onChange={(model, on) => void homeStore.setDynamic(ai.id, model, on)} />
 			{refresh === "running" && (
 				<Flex gap="2" align="center" role="status">
 					<Spinner size="1" />

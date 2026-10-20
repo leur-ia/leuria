@@ -138,9 +138,27 @@ export async function yourAiModels(defaultAgent: string, siteAgents: string[]): 
 	return found;
 }
 
-/** Candidates a dynamic site may use: those costing no more than `upTo`. */
-export function withinCeiling<C extends Candidate>(candidates: C[], upTo: Cost): C[] {
-	return candidates.filter((c) => COST[c.traits.cost] <= COST[upTo]);
+/** How an AI or one of its models is named in the dynamic-selection off list. */
+export function dynamicKey(agent: string, model?: string): string {
+	return model ? `${agent}@${model}` : agent;
+}
+
+/** Whether dynamic selection may use this model: its AI and itself are not left out. */
+export function inDynamic(agent: string, model: string | undefined, off: string[] = loadConfig().dynamicOff ?? []): boolean {
+	return !off.includes(agent) && (model === undefined || !off.includes(dynamicKey(agent, model)));
+}
+
+/** Leave an AI or model out of dynamic selection, or put it back. */
+export function setDynamic(agent: string, model: string | undefined, on: boolean): void {
+	const config = loadConfig();
+	const key = dynamicKey(agent, model);
+	const off = (config.dynamicOff ?? []).filter((k) => k !== key);
+	saveConfig({ ...config, dynamicOff: on ? off : [...off, key] });
+}
+
+/** Candidates a dynamic site may use: costing no more than `upTo`, and not left out by the visitor. */
+export function forDynamic<C extends Candidate>(candidates: C[], upTo: Cost, off?: string[]): C[] {
+	return candidates.filter((c) => COST[c.traits.cost] <= COST[upTo] && inDynamic(c.agent, c.model, off));
 }
 
 const CEILING_WORDS: Record<Cost, string> = { free: "on this computer", plan: "on this computer or your plans", paid: "" };
@@ -152,7 +170,7 @@ const CEILING_WORDS: Record<Cost, string> = { free: "on this computer", plan: "o
 export async function resolveSiteAi(grant: Grant | undefined, defaultAgent: string, siteAgents: () => string[]): Promise<AgentLaunch & { name: string }> {
 	if (!grant?.agent || !isDynamic(grant.agent)) return resolveSiteAgent(grant, defaultAgent);
 	const upTo = dynamicCeiling(grant.agent);
-	const best = recommend(grant.needs, withinCeiling(await yourAiModels(defaultAgent, siteAgents()), upTo));
+	const best = recommend(grant.needs, forDynamic(await yourAiModels(defaultAgent, siteAgents()), upTo));
 	if (!best) throw new Error(`None of your AIs ${CEILING_WORDS[upTo] || "available"} fits this site. Choose one for it in Leuria.`);
 	return resolveAgentCommand(best.agent, best.model);
 }
