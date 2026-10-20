@@ -357,7 +357,7 @@ function SiteRow({
 						onOpen={() => void homeStore.loadFit(site.origin)}
 					>
 						<AiChoiceCard
-							title={dynamic ? dynamicTitle(fit, ais) : currentName ? ` · ` : currentAiName}
+							title={dynamic ? dynamicTitle(fit, ais) : currentName ? `${currentAiName} · ${currentName}` : currentAiName}
 							cost={costWords(currentCost, currentAiName)}
 							verdict={currentVerdict}
 							needs={needsSentence(site.needs)}

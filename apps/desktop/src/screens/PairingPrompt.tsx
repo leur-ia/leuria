@@ -86,7 +86,7 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 						{request.app ?? host} wants to use your AI
 					</Dialog.Title>
 					<AiChoiceCard
-						title={dynamic ? dynamicTitle(choice.fit, choice.ais) : currentName ? ` · ` : aiName}
+						title={dynamic ? dynamicTitle(choice.fit, choice.ais) : currentName ? `${aiName} · ${currentName}` : aiName}
 						cost={costWords(currentCost, aiName)}
 						verdict={declared && !dynamic ? verdictOf(choice.fit, agentId, current) : undefined}
 						needs={needsSentence(request.needs)}
