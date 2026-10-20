@@ -1,7 +1,7 @@
 import { createStore } from "@sinuxjs/core";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
 
-import { type AgentModels, type DecisionModels, engine, EngineOutdated, errorMessage, onEngine, failureText, type Fit, friendlyName, type SearchChoice, type SearchModels, type SignInStatus, type Site, type TestResult, type YourAi } from "../engine";
+import { type Activity, type AgentModels, type DecisionModels, engine, EngineOutdated, errorMessage, onEngine, failureText, type Fit, friendlyName, type SearchChoice, type SearchModels, type SignInStatus, type Site, type TestResult, type YourAi } from "../engine";
 import { appStore } from "./app.store";
 
 /** The sidebar's pages. */
@@ -16,6 +16,8 @@ export interface HomeState {
 	autostart: boolean;
 	/** AIs and models the visitor left out of dynamic selection. */
 	dynamicOff: string[];
+	/** What each site asked of your AI (null until loaded). */
+	activity: Activity | null;
 	/** "Check that it works", per AI (a real question to it). */
 	checks: Record<string, TestResult | "running">;
 	/** A site whose AI is being set up (installed or checked). */
@@ -43,6 +45,7 @@ const initial: HomeState = {
 	ais: [],
 	autostart: false,
 	dynamicOff: [],
+	activity: null,
 	checks: {},
 	settingUp: null,
 	signInNeeded: null,
@@ -65,7 +68,23 @@ function safeOrigin(value: string): string {
 }
 
 export const homeStore = createStore(initial, {
-	showTab: (_state, tab: HomeTab) => ({ tab }),
+	showTab: (_state, tab: HomeTab) => {
+		// Websites shows what each site asked: fresh each time it opens.
+		if (tab === "sites") void homeStore.loadActivity();
+		return { tab };
+	},
+	/** What each site asked: after a turn ends, and when Websites opens. */
+	loadActivity: async () => ({ activity: await engine.activity().catch(() => null) }),
+	/** Pause a site (it gets refusals, keeps its grant) or resume it. */
+	pauseSite: async (state, origin: string, paused: boolean) => {
+		try {
+			await engine.pauseSite(origin, paused);
+			return { sites: await engine.sites(), error: "" };
+		} catch (error) {
+			console.warn("Pausing the site failed:", error);
+			return { error: failureText(error, paused ? "The site wasn't paused. Try again." : "The site wasn't resumed. Try again."), sites: state.sites };
+		}
+	},
 	/** A site asked (through a link, from the visitor's click) to change its AI or model: open its settings. Unknown sites are ignored. */
 	focusSite: async (_state, origin: string): Promise<Partial<HomeState>> => {
 		const sites = await engine.sites().catch(() => null);
@@ -81,8 +100,14 @@ export const homeStore = createStore(initial, {
 	},
 	load: async () => {
 		// Your AIs come from Leuria's own list: nothing is searched or started.
-		const [sites, ais, autostart, dynamicOff] = await Promise.all([engine.sites(), engine.ais().catch(() => [] as YourAi[]), isEnabled().catch(() => false), engine.dynamicOff().catch(() => [] as string[])]);
-		return { sites, ais, autostart, dynamicOff };
+		const [sites, ais, autostart, dynamicOff, activity] = await Promise.all([
+			engine.sites(),
+			engine.ais().catch(() => [] as YourAi[]),
+			isEnabled().catch(() => false),
+			engine.dynamicOff().catch(() => [] as string[]),
+			engine.activity().catch(() => null),
+		]);
+		return { sites, ais, autostart, dynamicOff, activity };
 	},
 	/** Models of Your AIs (saved ones: an AI is started only if it never listed them). */
 	loadAiModels: async (state) => {

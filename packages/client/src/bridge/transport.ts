@@ -333,6 +333,8 @@ export class BridgeClient {
 				attachments: options.attachments,
 				systemPrompt: options.systemPrompt,
 				maxTurns: options.maxTurns,
+				// Leuria counts what a page asks while the visitor isn't looking at it, with a lower cap.
+				...hiddenFlag(),
 				// The site's current list: Leuria picks up skills it added or removed.
 				...(this.skills ? { skills: this.skills } : {}),
 			},
@@ -421,7 +423,7 @@ export class BridgeSession {
 	/** Follow-up prompt on an idle session; the agent keeps its context. */
 	async prompt(text: string, attachments?: BridgeAttachment[]): Promise<void> {
 		this.status = "running";
-		await this.client.post(`/session/${this.id}/prompt`, { prompt: text, attachments });
+		await this.client.post(`/session/${this.id}/prompt`, { prompt: text, attachments, ...hiddenFlag() });
 	}
 
 	/** Stop the current turn and keep the session. */
@@ -676,4 +678,9 @@ function defaultStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem"> {
 		setItem: (key, value) => void memory.set(key, value),
 		removeItem: (key) => void memory.delete(key),
 	};
+}
+
+/** `{ hidden: true }` when the page is not visible (a background tab): the engine caps those turns lower. */
+function hiddenFlag(): { hidden?: true } {
+	return typeof document !== "undefined" && document.visibilityState === "hidden" ? { hidden: true } : {};
 }

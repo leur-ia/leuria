@@ -79,6 +79,8 @@ leuria({ app: "Kiln & Co.", needs: { tools: true, effort: "light" } })
 
 When the visitor connects, and whenever they change the site's AI, Leuria shows "Recommended for this site", with a reason ("On this computer: free, and enough for this site"). It marks other models "More than this site needs" or "May struggle here". It's guidance only: the visitor decides. Declare what your features really need: over-declaring shows up to the visitor as models marked "More than this site needs". There are no model names in this vocabulary, on purpose.
 
+Leuria also counts what your site asks: the visitor sees "Today: 12 questions · 4 min" next to your site in the app, and can pause it. A site is refused past 120 turns an hour, or 20 from a tab the visitor is not looking at; the refusal comes back as the request's error, in plain words. Ordinary use never gets near these numbers. A feature that would (a batch over a whole catalogue, say) belongs on your own server, not on the visitor's AI.
+
 The visitor can also put your site on **dynamic selection** instead of one AI: each conversation then starts on the lightest of their AIs that is enough for what you declared, among those available at that moment, and never past the ceiling they set (AIs on their computer only, their plans too, or paid ones too). Your declared needs are what it chooses on, so declaring them honestly is what makes it work well for your site. When the visitor has a decision model (see [Decisions](decisions.md)), it also weighs the first message of each conversation, so a quick question goes to a light model and a long task to a strong one, within what you declared and their ceiling.
 
 ## Routing

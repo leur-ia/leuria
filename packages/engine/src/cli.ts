@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 
 import { agentName, listAgents, pruneAgentVersions, resolveAgentCommand, updateAgents } from "./agents.js";
 import { createAdminHandler } from "./admin.js";
+import { Activity } from "./activity.js";
 import { convertServiceAis, resolveSiteAi, siteAiLabel } from "./ais.js";
 import { aiLabel, checkSignIn, rememberAgentState, signIn } from "./auth.js";
 import { agentId, detectInstalledClis } from "./detect.js";
@@ -206,6 +207,7 @@ async function selfTest(config: EngineConfig, verbose: boolean): Promise<void> {
 
 function sites(args: string[]): void {
 	const grants = new GrantStore();
+	const activity = new Activity();
 	convertServiceAis(grants);
 	const [sub, origin] = args;
 	if (sub === "use") {
@@ -264,6 +266,7 @@ async function start(config: EngineConfig, verbose: boolean): Promise<void> {
 	saveConfig(config);
 
 	const grants = new GrantStore();
+	const activity = new Activity();
 	convertServiceAis(grants);
 	config.agent = loadConfig().agent;
 	const stdioMcpCommand = stdioMcpSelf();
@@ -347,6 +350,7 @@ async function startForApp(config: EngineConfig, verbose: boolean, devPairing: b
 	const emit = (event: Record<string, unknown>) => process.stdout.write(`${JSON.stringify(event)}\n`);
 	const logger = createLogger(verbose);
 	const grants = new GrantStore();
+	const activity = new Activity();
 	convertServiceAis(grants);
 	config.agent = loadConfig().agent;
 	// Versions left by an update: nothing runs them yet.
@@ -372,9 +376,11 @@ async function startForApp(config: EngineConfig, verbose: boolean, devPairing: b
 		silent: !devPairing,
 		onPairingRequest: (request) => emit({ event: "pairing", ...request }),
 		onPairingDecided: (decision) => emit({ event: "pairing_decided", ...decision }),
+		activity,
+		onActivity: (origin) => emit({ event: "activity", origin }),
 		admin: {
 			token,
-			handle: createAdminHandler({ config, grants, logger, port: () => port, emit }),
+			handle: createAdminHandler({ config, grants, logger, activity, port: () => port, emit }),
 		},
 	}).catch((err: NodeJS.ErrnoException) => {
 		emit({ event: "error", code: err.code ?? "start_failed", message: err.message });

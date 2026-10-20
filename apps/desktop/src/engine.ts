@@ -60,6 +60,22 @@ export interface Site {
 	needs?: SiteNeeds;
 	/** The skills the site gives its AI. */
 	skills?: { list: SkillInfo[] };
+	/** Paused by the visitor: it gets refusals until they resume it. */
+	paused?: boolean;
+}
+
+/** What a site asked of your AI: today, and in the last hour. */
+export interface SiteActivity {
+	today: { turns: number; seconds: number };
+	hour: number;
+	hiddenHour: number;
+	/** Over the hourly cap: refused until the hour passes. */
+	limited: boolean;
+}
+
+export interface Activity {
+	sites: Record<string, SiteActivity>;
+	caps: { hour: number; hiddenHour: number };
 }
 
 export interface PairingRequest {
@@ -264,6 +280,10 @@ export const engine = {
 	setSiteAgent: (origin: string, agent: string | null) =>
 		call<{ origin: string; agent: string | null; signIn: SignInStatus }>("POST", "/sites/agent", { origin, agent }),
 	disconnect: (origin: string) => call<{ removed: boolean }>("DELETE", `/sites?origin=${encodeURIComponent(origin)}`),
+	/** What each site asked today and in the last hour. */
+	activity: () => call<Activity>("GET", "/activity"),
+	/** A paused site gets refusals and keeps its grant. */
+	pauseSite: (origin: string, paused: boolean) => call<{ origin: string; paused: boolean }>("POST", "/sites/pause", { origin, paused }),
 	/** Allow or refuse a site; on Allow, optionally its AI (null: the default) and model from the first message. */
 	decide: (requestId: string, allow: boolean, choice: SiteChoice = {}) => call<{ ok: boolean }>("POST", `/pairing/${requestId}`, { allow, ...choice }),
 	/** How Your AIs fit a site: the needs of a request being approved, or those of a connected site. */

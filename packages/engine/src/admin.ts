@@ -42,6 +42,7 @@ import { type Cost, fitOf, reasonFor, recommend, type Verdict } from "./fit.js";
 import { parseNeeds, type SiteNeeds } from "./needs.js";
 import { detectInstalledClis } from "./detect.js";
 import type { GrantStore } from "./grants.js";
+import { type Activity, HIDDEN_HOURLY_CAP, HOURLY_CAP } from "./activity.js";
 import { addAi, dynamicCeiling, forDynamic, isDynamic, providerInUse, removeAi, setDynamic, yourAiModels, yourAis } from "./ais.js";
 import { type DecideChoice, type EmbedChoice, type EngineConfig, isKnownReady, loadConfig, saveConfig } from "./home.js";
 import { askSystemOne, decisionBaseUrl, DEFAULT_DECISION_URL, listLocalDeciders, probeService, systemOneDecisions } from "./llm/decisions.js";
@@ -60,6 +61,8 @@ interface AdminContext {
 	grants: GrantStore;
 	logger: Logger;
 	port: () => number;
+	/** What each site asks, counted. */
+	activity: Activity;
 	/** Tell the app something changed (JSON line on stdout). */
 	emit: (event: Record<string, unknown>) => void;
 }
@@ -357,6 +360,19 @@ export function createAdminHandler(ctx: AdminContext) {
 			if (agent && !isDynamic(agent)) addAi(agent);
 			const signIn = agent && !isDynamic(agent) ? await checkSignIn(agent) : { ok: true, detail: "default AI", methods: [] };
 			sendJson(res, 200, { origin: body.origin, agent: agent ?? null, signIn });
+			return true;
+		}
+		if (route === "GET /activity") {
+			sendJson(res, 200, { sites: ctx.activity.summary(), caps: { hour: HOURLY_CAP, hiddenHour: HIDDEN_HOURLY_CAP } });
+			return true;
+		}
+		if (route === "POST /sites/pause") {
+			const body = (await parseBody(req)) as { origin?: unknown; paused?: unknown };
+			if (typeof body.origin !== "string" || typeof body.paused !== "boolean" || !ctx.grants.setPaused(body.origin, body.paused)) {
+				sendJson(res, 404, { error: "This site is not connected" });
+				return true;
+			}
+			sendJson(res, 200, { origin: body.origin, paused: body.paused });
 			return true;
 		}
 		if (route === "DELETE /sites") {

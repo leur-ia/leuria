@@ -23,6 +23,7 @@ import type { GrantStore } from "./grants.js";
 import { normalizeOrigin } from "./grants.js";
 import { DEFAULT_PORT, loadConfig } from "./home.js";
 import { parseBody, sendJson } from "./http-utils.js";
+import { Activity } from "./activity.js";
 import { DecisionRefusedError, type Decisions, NoDecisionModelError, parseDecideBody, systemOneDecisions } from "./llm/decisions.js";
 import { type Embeddings, localEmbeddings, NoEmbedderError, parseEmbedBody } from "./llm/embeddings.js";
 import type { Logger } from "./logger.js";
@@ -77,6 +78,10 @@ interface EngineOptions {
 	embeddings?: Embeddings;
 	/** Decisions for connected sites. Default: a decision model in LM Studio or Ollama on this computer, or the service in config.json. */
 	decisions?: Decisions;
+	/** What each site asks, counted; the brake behind it. One in memory when absent. */
+	activity?: Activity;
+	/** A site's count changed (a turn ended). */
+	onActivity?: (origin: string) => void;
 	/** The skills sites give their AI. Default: fetched from GitHub or the site, cached in `~/.leuria/skills`. */
 	skills?: SkillService;
 }
@@ -109,6 +114,7 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 	const silent = options.silent ?? Boolean(options.admin);
 
 	const skills = options.skills ?? new SkillService({ grants, logger });
+	const activity = options.activity ?? new Activity(null);
 	const webMcpServer = new WebMcpServer(logger, port);
 	const sessions = new SessionManager({
 		webMcpServer,
@@ -119,11 +125,21 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 		startTimeoutMs: options.startTimeoutMs,
 		stdioMcpCommand: options.stdioMcpCommand,
 		onAgentState: options.onAgentState,
+		// Paused by the visitor, or past its hourly cap: the site gets refusals, its grant stays.
+		refusal: (origin, hidden) => (grants.get(origin)?.paused ? "You paused this site in Leuria. Resume it there to ask again." : activity.refusal(origin, hidden)),
+		onTurn: (origin, turn) => {
+			if (!grants.has(origin)) return;
+			activity.record(origin, turn);
+			options.onActivity?.(origin);
+		},
 	});
 	// A page that went away (crash, killed tab, lost close request) frees its slot.
 	webMcpServer.onBrowserGone = (sessionId) => sessions.close(sessionId);
 	// A revoked site loses its running agents too.
-	grants.onRemoved((origin) => sessions.closeWhere((o) => o === origin));
+	grants.onRemoved((origin) => {
+		sessions.closeWhere((o) => o === origin);
+		activity.forget(origin);
+	});
 	// A site's AI or model changed: its open conversation ends, the next message uses the new one.
 	grants.onChanged((origin) => sessions.closeWhere((o) => o === origin));
 	const pairing = new Pairing({

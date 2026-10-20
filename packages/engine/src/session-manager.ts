@@ -51,6 +51,8 @@ interface PrepareParams {
 	maxTurns?: number;
 	/** Origin that owns the session; `local` for requests without `Origin`. */
 	origin: string;
+	/** The page was not visible when it asked. */
+	hidden?: boolean;
 }
 
 interface SessionInfo {
@@ -150,6 +152,10 @@ export interface SessionManagerOptions {
 	 * support stdio MCP servers; HTTP is optional.
 	 */
 	stdioMcpCommand?: { command: string; args: string[] };
+	/** Why `origin` may not ask now (paused, over its hourly cap); undefined when it may. */
+	refusal?: (origin: string, hidden: boolean) => string | undefined;
+	/** A turn ended: what the site asked, counted. */
+	onTurn?: (origin: string, turn: { at: number; ms: number; hidden?: boolean }) => void;
 }
 
 /** Live (non-terminal) sessions one origin may hold at once. */
@@ -180,6 +186,8 @@ export class SessionManager {
 				`Too many open sessions for this site (${MAX_SESSIONS_PER_ORIGIN}). Close one first.`,
 			);
 		}
+		const refused = this.options.refusal?.(params.origin, params.hidden ?? false);
+		if (refused) throw new Error(refused);
 		if (params.maxTurns !== undefined) {
 			params.maxTurns = Math.min(Math.max(1, Math.floor(params.maxTurns)), MAX_TURNS_LIMIT);
 		}
@@ -215,8 +223,11 @@ export class SessionManager {
 		return this.toInfo(session);
 	}
 
-	promptTurn(sessionId: string, prompt: string, attachments: PromptAttachment[] = []): SessionInfo {
+	promptTurn(sessionId: string, prompt: string, attachments: PromptAttachment[] = [], hidden = false): SessionInfo {
 		const session = this.require(sessionId);
+		const refused = this.options.refusal?.(session.params.origin, hidden);
+		if (refused) throw new Error(refused);
+		session.params.hidden = hidden;
 		if (!session.live?.isAlive) {
 			throw new Error("Agent session has ended. Start a new session.");
 		}
@@ -457,6 +468,7 @@ export class SessionManager {
 			sessionId: session.id,
 			durationMs: Date.now() - startedAt,
 		});
+		this.options.onTurn?.(session.params.origin, { at: Date.now(), ms: Date.now() - startedAt, ...(session.params.hidden ? { hidden: true } : {}) });
 		this.notify(session, "turn_completed", {
 			text: session.turnChunks.join(""),
 			durationMs: Date.now() - startedAt,

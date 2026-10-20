@@ -1,9 +1,9 @@
 /**
  * `/session/*` HTTP surface.
  *
- *   POST /session/prepare           { prompt?, attachments?, systemPrompt?, maxTurns?, skills? }
+ *   POST /session/prepare           { prompt?, attachments?, systemPrompt?, maxTurns?, skills?, hidden? }
  *   POST /session/:id/approve
- *   POST /session/:id/prompt        { prompt, attachments? }
+ *   POST /session/:id/prompt        { prompt, attachments?, hidden? }
  *   POST /session/:id/cancel-turn
  *   POST /session/:id/cancel
  *   POST /session/:id/close
@@ -114,7 +114,7 @@ async function runAction(
 			if (typeof body.prompt !== "string" || !body.prompt.trim()) {
 				throw new Error("Missing required field: prompt");
 			}
-			return sm.promptTurn(sessionId, body.prompt, parseAttachments(body.attachments));
+			return sm.promptTurn(sessionId, body.prompt, parseAttachments(body.attachments), body.hidden === true);
 		}
 		case "cancel-turn":
 			return sm.cancelTurn(sessionId);
@@ -141,6 +141,7 @@ async function handlePrepare(
 	}
 	const info = sm.prepare({
 		prompt: body.prompt as string | undefined,
+		hidden: body.hidden === true,
 		attachments: parseAttachments(body.attachments),
 		systemPrompt:
 			typeof body.systemPrompt === "string" && body.systemPrompt ? body.systemPrompt : undefined,

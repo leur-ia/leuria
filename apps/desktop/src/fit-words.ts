@@ -35,3 +35,11 @@ export function verdictOf(fit: Fit | null, agent: string, model?: string): Verdi
 	const ai = fit.ais.find((a) => a.id === agent);
 	return model === undefined ? ai?.verdict : ai?.models.find((m) => m.id === model)?.verdict;
 }
+
+/** "12 questions · 4 min": what a site asked of your AI. Empty when nothing. */
+export function activityWords(today: { turns: number; seconds: number } | undefined): string {
+	if (!today?.turns) return "";
+	const questions = `${today.turns} question${today.turns === 1 ? "" : "s"}`;
+	const minutes = Math.round(today.seconds / 60);
+	return `${questions} · ${minutes < 1 ? "under a minute" : `${minutes} min`}`;
+}

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { Activity } from "../src/activity.js";
 import { createAdminHandler } from "../src/admin.js";
 import { agentsDir } from "../src/agents.js";
 import { codexHome } from "../src/codex.js";
@@ -33,7 +34,7 @@ beforeAll(async () => {
 		},
 		onPairingRequest: (r) => events.push({ event: "pairing", ...r }),
 		onPairingDecided: (d) => events.push({ event: "pairing_decided", ...d }),
-		admin: { token: TOKEN, handle: createAdminHandler({ config, grants, logger: silent, port: () => PORT, emit: (e) => events.push(e) }) },
+		admin: { token: TOKEN, handle: createAdminHandler({ config, grants, logger: silent, activity: new Activity(null), port: () => PORT, emit: (e) => events.push(e) }) },
 	});
 });
 afterAll(() => engine.close());

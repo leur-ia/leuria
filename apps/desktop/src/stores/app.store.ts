@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { type AgentModels, EngineOutdated, engine, failureText, friendlyName, onEngine, type PairingRequest, type SiteChoice, type Status } from "../engine";
+import { homeStore } from "./home.store";
 
 export type View = "loading" | "error" | "onboarding" | "home";
 
@@ -187,6 +188,8 @@ export const appStore = createStore(initial, {
 /** Engine events → store signals. Called once at startup, outside React. */
 export function bindEngineEvents(): void {
 	onEngine<PairingRequest>("pairing", (request) => void appStore.pairingRequested(request));
+	// A site's turn ended: its count on Websites moves.
+	onEngine("engine-activity", () => void homeStore.loadActivity());
 	onEngine<{ requestId: string }>("engine-pairing-decided", ({ requestId }) => {
 		void appStore.pairingSettled(requestId).then(() => appStore.refresh());
 	});

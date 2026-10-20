@@ -7,11 +7,11 @@ import { useEffect, useRef, useState } from "react";
 import { AgentModelSelect } from "../components/AgentModelSelect";
 import { AiChoiceCard } from "../components/AiChoiceCard";
 import { CeilingSelect, DYNAMIC, DYNAMIC_WORDS, dynamicId, dynamicTitle, isDynamic } from "../components/DynamicSelection";
-import { costWords, needsSentence, verdictOf, verdictWords } from "../fit-words";
+import { activityWords, costWords, needsSentence, verdictOf, verdictWords } from "../fit-words";
 import { Disclosure } from "../components/Disclosure";
 import { DynamicMembership } from "../components/DynamicSelection";
 import { SiteSkills } from "../components/SiteSkills";
-import { type AgentModels, type DecisionModels, describeCheck, engine, errorMessage, TYPESAFE_URL, type Fit, type SearchModels, searchModelName, signInLabel, friendlyName, trayName, type Site, type Status, type TestResult, type YourAi } from "../engine";
+import { type AgentModels, type Activity, type DecisionModels, describeCheck, type SiteActivity, engine, errorMessage, TYPESAFE_URL, type Fit, type SearchModels, searchModelName, signInLabel, friendlyName, trayName, type Site, type Status, type TestResult, type YourAi } from "../engine";
 import { appStore } from "../stores/app.store";
 import { homeStore, type HomeTab } from "../stores/home.store";
 import { onboardingStore } from "../stores/onboarding.store";
@@ -21,7 +21,7 @@ const DEFAULT = "default";
 const SAME_MODEL = "leuria:same-as-ai";
 
 export function Home({ status }: { status: Status }) {
-	const { tab, sites, ais, autostart, dynamicOff, checks, modelRefresh, settingUp, signInNeeded, aiModels, search, decisions, focus, fits, error } = useStore(homeStore);
+	const { tab, sites, ais, autostart, dynamicOff, activity, checks, modelRefresh, settingUp, signInNeeded, aiModels, search, decisions, focus, fits, error } = useStore(homeStore);
 	const models = useStore(appStore, (s) => s.models);
 
 	useEffect(() => {
@@ -63,6 +63,12 @@ export function Home({ status }: { status: Status }) {
 						<Heading as="h1" size="4">
 							Websites
 						</Heading>
+						{/* What every site asked of your AI today, added up: the number a runaway site would move. */}
+						{activity && sites.length > 0 && (
+							<Text size="2" color="gray" role="status">
+								{activityWords(totalToday(activity, sites)) ? `Today, your AI answered ${activityWords(totalToday(activity, sites))} for these sites.` : "Nothing asked of your AI today."}
+							</Text>
+						)}
 						<Card size="2">
 							<Flex direction="column" gap="3">
 								{sites.length === 0 ? (
@@ -88,6 +94,8 @@ export function Home({ status }: { status: Status }) {
 												signInNeeded={signInNeeded?.origin === site.origin ? signInNeeded : null}
 												focused={focus === site.origin}
 												fit={fits[site.origin] ?? null}
+												activity={activity?.sites[site.origin] ?? null}
+												caps={activity?.caps ?? null}
 											/>
 										))}
 									</div>
@@ -225,8 +233,13 @@ function SiteRow({
 	focused,
 	fit,
 	decisions,
+	activity,
+	caps,
 }: {
 	site: Site;
+	/** What the site asked of your AI today and in the last hour. */
+	activity: SiteActivity | null;
+	caps: { hour: number; hiddenHour: number } | null;
 	status: Status;
 	ais: YourAi[];
 	/** Models of the site's AI, when it lets you choose. */
@@ -291,6 +304,11 @@ function SiteRow({
 						</Link>
 					</Text>
 				</Flex>
+				{site.paused && (
+					<Badge color="gray" variant="soft" size="2">
+						Paused
+					</Badge>
+				)}
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						<IconButton variant="ghost" color="gray" aria-label={`More for ${siteName}`}>
@@ -299,6 +317,7 @@ function SiteRow({
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content align="end">
 						<DropdownMenu.Item onSelect={() => void invoke("open_link", { url: site.origin })}>Open the site</DropdownMenu.Item>
+						<DropdownMenu.Item onSelect={() => void homeStore.pauseSite(site.origin, !site.paused)}>{site.paused ? "Resume" : "Pause"}</DropdownMenu.Item>
 						<DropdownMenu.Separator />
 						<DropdownMenu.Item color="red" onSelect={() => void homeStore.disconnect(site.origin)}>
 							Disconnect
@@ -306,6 +325,27 @@ function SiteRow({
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			</Flex>
+			{/* What it asked today: the line that tells a quiet site from a runaway one. */}
+			<Text size="1" color="gray">
+				{activityWords(activity?.today) ? `Today: ${activityWords(activity?.today)}` : "Nothing asked today"}
+				{activity && activity.hour > 0 ? ` · ${activity.hour} in the last hour` : ""}
+			</Text>
+			{site.paused && (
+				<Callout.Root color="gray" size="1">
+					<Callout.Icon>
+						<Icon name="alert" />
+					</Callout.Icon>
+					<Callout.Text>Paused: this site gets no answers until you resume it. It stays connected.</Callout.Text>
+				</Callout.Root>
+			)}
+			{!site.paused && activity?.limited && caps && (
+				<Callout.Root color="amber" size="1">
+					<Callout.Icon>
+						<Icon name="alert" />
+					</Callout.Icon>
+					<Callout.Text>{`This site asked your AI ${activity.hour} times in the last hour, Leuria's limit of ${caps.hour}. It gets no more answers until the hour passes. Pause it if you didn't expect this.`}</Callout.Text>
+				</Callout.Root>
+			)}
 			{/* Advanced: which AI and model this site uses, folded into one line that says it. */}
 			<Flex align="start" gap="2">
 				<Box flexGrow="1" minWidth="0">
@@ -806,5 +846,16 @@ function AiRow({
 				</Flex>
 			)}
 		</div>
+	);
+}
+
+/** Every connected site's turns and time today, added up. */
+function totalToday(activity: Activity, sites: Site[]): { turns: number; seconds: number } {
+	return sites.reduce(
+		(sum, site) => {
+			const today = activity.sites[site.origin]?.today;
+			return { turns: sum.turns + (today?.turns ?? 0), seconds: sum.seconds + (today?.seconds ?? 0) };
+		},
+		{ turns: 0, seconds: 0 },
 	);
 }

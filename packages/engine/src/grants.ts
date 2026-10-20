@@ -28,6 +28,8 @@ interface Grant {
 	needs?: SiteNeeds;
 	/** The skills the site gives its AI: the refs it declared and what they resolved to. */
 	skills?: SiteSkills;
+	/** The visitor paused it: it keeps its grant and gets refusals until they resume it. */
+	paused?: boolean;
 }
 
 export class GrantStore {
@@ -94,6 +96,18 @@ export class GrantStore {
 			(g) => {
 				if (choice) g.decide = choice;
 				else delete g.decide;
+			},
+			false,
+		);
+	}
+
+	/** Pause a site (it gets refusals) or resume it. Open conversations are unaffected until their next message. */
+	setPaused(origin: string, paused: boolean): boolean {
+		return this.update(
+			origin,
+			(g) => {
+				if (paused) g.paused = true;
+				else delete g.paused;
 			},
 			false,
 		);
