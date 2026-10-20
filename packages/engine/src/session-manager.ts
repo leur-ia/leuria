@@ -133,7 +133,8 @@ export interface SessionManagerOptions {
 	port: number;
 	logger: Logger;
 	/** Command for the agent serving `origin`: its own choice, or the default AI. */
-	resolveAgent: (origin: string) => Promise<AgentLaunch>;
+	/** The AI for a session; `prompt` is its first message, when the page sent one with it. */
+	resolveAgent: (origin: string, prompt?: string) => Promise<AgentLaunch>;
 	/** The skills `origin` gives its AI, already fetched: the agent gets their list and `read_skill`. */
 	loadSkills?: (origin: string) => Promise<SkillContent[]>;
 	/** ACP handshake timeout. */
@@ -296,7 +297,7 @@ export class SessionManager {
 		const { logger } = this.options;
 		let launch: AgentLaunch;
 		try {
-			launch = await this.options.resolveAgent(session.params.origin);
+			launch = await this.options.resolveAgent(session.params.origin, session.params.prompt);
 		} catch (err) {
 			this.fail(session, err instanceof Error ? err.message : String(err));
 			return;

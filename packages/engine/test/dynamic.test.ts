@@ -24,3 +24,23 @@ describe("dynamic selection", () => {
 		expect(forDynamic([{ ...all[0]!, model: "qwen3:4b" }], "paid", ["llm:ollama@qwen3:4b"])).toEqual([]);
 	});
 });
+
+import { judgeEffort } from "../src/ais.js";
+import type { Decisions } from "../src/llm/decisions.js";
+
+const deciding = (choice: unknown): Decisions => ({
+	find: async () => undefined,
+	decide: async () => ({ model: "nimble", answers: { effort: { choice } } }),
+});
+
+describe("the first message's weight, from the decision model", () => {
+	it("takes a known effort, and nothing when there is no model, no message or no sense", async () => {
+		expect(await judgeEffort({ prompt: "Which mug is cheapest?", decisions: deciding("light") })).toBe("light");
+		expect(await judgeEffort({ prompt: "Plan my kitchen", decisions: deciding("deep") }, "light")).toBe("deep");
+		expect(await judgeEffort({ prompt: "hi", decisions: deciding("huge") })).toBeUndefined();
+		expect(await judgeEffort({ prompt: "  ", decisions: deciding("light") })).toBeUndefined();
+		expect(await judgeEffort({ prompt: "hi" })).toBeUndefined();
+		const failing: Decisions = { find: async () => undefined, decide: async () => { throw new Error("gone"); } };
+		expect(await judgeEffort({ prompt: "hi", decisions: failing })).toBeUndefined();
+	});
+});

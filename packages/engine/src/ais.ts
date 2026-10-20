@@ -8,10 +8,11 @@
  */
 
 import { agentName, isAvailable, resolveAgentCommand, resolveSiteAgent } from "./agents.js";
+import type { Decisions } from "./llm/decisions.js";
 import type { AgentLaunch } from "./session-manager.js";
 import { seenAgentModels } from "./auth.js";
 import { type Candidate, COST, type Cost, recommend, traitsOf } from "./fit.js";
-import type { SiteNeeds } from "./needs.js";
+import type { Effort, SiteNeeds } from "./needs.js";
 import { loadConfig, saveConfig } from "./home.js";
 import { getProvider, listModels, parseLlmId } from "./llm/providers.js";
 
@@ -163,14 +164,61 @@ export function forDynamic<C extends Candidate>(candidates: C[], upTo: Cost, off
 
 const CEILING_WORDS: Record<Cost, string> = { free: "on this computer", plan: "on this computer or your plans", paid: "" };
 
+/** What a conversation starts with, for dynamic selection to weigh. */
+export interface PickContext {
+	origin?: string;
+	/** The first message, when the page sent one with the conversation. */
+	prompt?: string;
+	/** The decision model, when there is one: it judges how hard the message is. */
+	decisions?: Decisions;
+}
+
+const EFFORTS: Record<Effort, string> = {
+	light: "a quick answer: a lookup, an extraction, a summary, a short reply",
+	standard: "several steps, using the site's features or tools",
+	deep: "long reasoning, planning, or many steps that build on each other",
+};
+
+/**
+ * How hard the first message is, from the decision model: `light`,
+ * `standard` or `deep`. Undefined when there is no decision model, it
+ * doesn't answer in time, or the message is missing: the site's own
+ * declaration then stands.
+ */
+export async function judgeEffort(context: PickContext, declared?: Effort): Promise<Effort | undefined> {
+	const { prompt, decisions, origin } = context;
+	if (!prompt?.trim() || !decisions) return undefined;
+	try {
+		const { answers } = await decisions.decide(
+			{
+				state: { message: prompt.slice(0, 4000), ...(declared ? { the_site_usually_needs: EFFORTS[declared] } : {}) },
+				questions: { effort: { type: "choice", instructions: "How much work does `message` ask of an AI assistant on this website?", criteria: EFFORTS } },
+			},
+			AbortSignal.timeout(JUDGE_MS),
+			origin,
+		);
+		const choice = (answers.effort as { choice?: unknown } | undefined)?.choice;
+		return choice === "light" || choice === "standard" || choice === "deep" ? choice : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+// ponytail: one fixed wait; a decision model answers in well under a second when loaded.
+const JUDGE_MS = 4000;
+
 /**
  * The AI and model a site uses, launched: its own choices, the default AI,
- * or, on dynamic selection, the cheapest of Your AIs that fits it right now.
+ * or, on dynamic selection, the cheapest of Your AIs that fits it right
+ * now. With a decision model and a first message, the message's own
+ * weight decides the strength needed, within what the site declared.
  */
-export async function resolveSiteAi(grant: Grant | undefined, defaultAgent: string, siteAgents: () => string[]): Promise<AgentLaunch & { name: string }> {
+export async function resolveSiteAi(grant: Grant | undefined, defaultAgent: string, siteAgents: () => string[], context: PickContext = {}): Promise<AgentLaunch & { name: string }> {
 	if (!grant?.agent || !isDynamic(grant.agent)) return resolveSiteAgent(grant, defaultAgent);
 	const upTo = dynamicCeiling(grant.agent);
-	const best = recommend(grant.needs, forDynamic(await yourAiModels(defaultAgent, siteAgents()), upTo));
+	const [candidates, effort] = await Promise.all([yourAiModels(defaultAgent, siteAgents()), judgeEffort(context, grant.needs?.effort)]);
+	const needs = effort ? { ...grant.needs, effort } : grant.needs;
+	const best = recommend(needs, forDynamic(candidates, upTo));
 	if (!best) throw new Error(`None of your AIs ${CEILING_WORDS[upTo] || "available"} fits this site. Choose one for it in Leuria.`);
 	return resolveAgentCommand(best.agent, best.model);
 }

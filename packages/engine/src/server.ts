@@ -42,7 +42,8 @@ interface EngineOptions {
 	/** What a connected site uses, for its status line ("Claude · Sonnet 5"); the default AI's name otherwise. */
 	siteAgentName?: (origin: string) => string;
 	/** Command for the agent serving `origin` (a site's own choice or the default); called once per session. */
-	resolveAgent: (origin: string) => Promise<AgentLaunch>;
+	/** The AI for a session. `context`: its first message, when there is one, and the decision model, for dynamic selection. */
+	resolveAgent: (origin: string, context: { prompt?: string; decisions: Decisions }) => Promise<AgentLaunch>;
 	/** Called when a site asks to connect. */
 	onPairingRequest?: (request: PairingRequestInfo) => void;
 	onPairingDecided?: (request: { requestId: string; origin: string; allowed: boolean }) => void;
@@ -113,7 +114,7 @@ export async function startEngine(options: EngineOptions): Promise<EngineHandle>
 		webMcpServer,
 		port,
 		logger,
-		resolveAgent: options.resolveAgent,
+		resolveAgent: (origin, prompt) => options.resolveAgent(origin, { prompt, decisions }),
 		loadSkills: (origin) => skills.forSession(origin),
 		startTimeoutMs: options.startTimeoutMs,
 		stdioMcpCommand: options.stdioMcpCommand,

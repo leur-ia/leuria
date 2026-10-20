@@ -274,7 +274,7 @@ async function start(config: EngineConfig, verbose: boolean): Promise<void> {
 			grants,
 			logger,
 			agentName: agentName(config.agent),
-			resolveAgent: (origin) => resolveSiteAi(grants.get(origin), config.agent, () => grants.list().flatMap((g) => (g.agent ? [g.agent] : []))),
+			resolveAgent: (origin, context) => resolveSiteAi(grants.get(origin), config.agent, () => grants.list().flatMap((g) => (g.agent ? [g.agent] : [])), { origin, ...context }),
 			onAgentState: rememberAgentState,
 			stdioMcpCommand,
 			// No app to ask in: the engine's own approval page, in the browser.
@@ -361,7 +361,7 @@ async function startForApp(config: EngineConfig, verbose: boolean, devPairing: b
 		grants,
 		logger,
 		agentName: () => agentName(config.agent),
-		resolveAgent: (origin) => resolveSiteAi(grants.get(origin), config.agent, () => grants.list().flatMap((g) => (g.agent ? [g.agent] : []))),
+		resolveAgent: (origin, context) => resolveSiteAi(grants.get(origin), config.agent, () => grants.list().flatMap((g) => (g.agent ? [g.agent] : [])), { origin, ...context }),
 		siteAgentName: (origin) => siteAiLabel(grants.get(origin), config.agent, aiLabel),
 		// A real session is the check: remember it, and tell the app when an AI is signed out.
 		onAgentState: (id, state) => {
