@@ -79,6 +79,8 @@ leuria({ app: "Kiln & Co.", needs: { tools: true, effort: "light" } })
 
 When the visitor connects, and whenever they change the site's AI, Leuria shows "Recommended for this site", with a reason ("On this computer: free, and enough for this site"). It marks other models "More than this site needs" or "May struggle here". It's guidance only: the visitor decides. Declare what your features really need: over-declaring shows up to the visitor as models marked "More than this site needs". There are no model names in this vocabulary, on purpose.
 
+The visitor can also put your site on **dynamic selection** instead of one AI: each conversation then starts on the lightest of their AIs that is enough for what you declared, among those available at that moment, and never past the ceiling they set (AIs on their computer only, their plans too, or paid ones too). Your declared needs are what it chooses on, so declaring them honestly is what makes it work well for your site.
+
 ## Routing
 
 Every request and conversation takes routing options:

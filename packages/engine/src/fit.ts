@@ -27,7 +27,7 @@ interface ModelTraits {
 
 const RANK: Record<Tier, number> = { small: 0, medium: 1, large: 2 };
 const NEEDED: Record<Effort, Tier> = { light: "small", standard: "medium", deep: "large" };
-const COST: Record<Cost, number> = { free: 0, plan: 1, paid: 2 };
+export const COST: Record<Cost, number> = { free: 0, plan: 1, paid: 2 };
 
 /** By size: under 9B quick answers, up to 40B everyday work, above that hard tasks. */
 function tierFromParams(billions: number): Tier {

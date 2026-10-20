@@ -263,7 +263,8 @@ export const engine = {
 	/** Allow or refuse a site; on Allow, optionally its AI (null: the default) and model from the first message. */
 	decide: (requestId: string, allow: boolean, choice: SiteChoice = {}) => call<{ ok: boolean }>("POST", `/pairing/${requestId}`, { allow, ...choice }),
 	/** How Your AIs fit a site: the needs of a request being approved, or those of a connected site. */
-	fit: (of: { needs?: SiteNeeds; origin?: string }) => call<Fit>("POST", "/fit", of),
+	/** `upTo`: for a dynamic choice being made, the ceiling the recommendation must respect. */
+	fit: (of: { needs?: SiteNeeds; origin?: string; upTo?: Cost }) => call<Fit>("POST", "/fit", of),
 	/** A leuria://connect link reached the app: the engine asks the visitor (a `pairing` event follows). */
 	link: (link: ConnectLink) => call<{ requestId: string }>("POST", "/pairing/link", link),
 	/** A real question to an AI (the default one without `agent`). */

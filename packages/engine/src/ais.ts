@@ -7,9 +7,16 @@
  * (`llm:lmstudio/qwen3-8b`): a service's model is an AI of its own.
  */
 
-import { isAvailable } from "./agents.js";
+import { agentName, isAvailable, resolveAgentCommand, resolveSiteAgent } from "./agents.js";
+import type { AgentLaunch } from "./session-manager.js";
+import { seenAgentModels } from "./auth.js";
+import { type Candidate, COST, type Cost, recommend, traitsOf } from "./fit.js";
+import type { SiteNeeds } from "./needs.js";
 import { loadConfig, saveConfig } from "./home.js";
-import { parseLlmId } from "./llm/providers.js";
+import { getProvider, listModels, parseLlmId } from "./llm/providers.js";
+
+/** What of a grant the AI choice reads. */
+type Grant = { agent?: string; model?: { agent: string; id: string }; needs?: SiteNeeds };
 
 /**
  * The default first, then the others in the order they were added. AIs a
@@ -80,4 +87,79 @@ export function convertServiceAis(grants: { list(): Array<{ origin: string; agen
 		grants.setAgent(grant.origin, service.id);
 		grants.setModel(grant.origin, { agent: service.id, id: service.model });
 	}
+}
+
+// ── Dynamic selection ───────────────────────────────────────────────────
+//
+// A site on dynamic selection has no AI of its own: each conversation
+// starts on the cheapest of Your AIs that is enough for what the site
+// declared it needs (`fit.ts`), among those available right now. The
+// visitor sets how far it may go: AIs on this computer only, their plans
+// too, or paid ones too. Stored as the site's agent id: `dynamic`,
+// `dynamic:free`, `dynamic:plan` (`dynamic` alone: paid too).
+
+export const DYNAMIC = "dynamic";
+
+export function isDynamic(id: string | undefined): boolean {
+	return id === DYNAMIC || (id?.startsWith(`${DYNAMIC}:`) ?? false);
+}
+
+/** The most a dynamic site may cost: `free`, `plan` or `paid`. */
+export function dynamicCeiling(id: string): Cost {
+	const upTo = id.split(":")[1];
+	return upTo === "free" || upTo === "plan" ? upTo : "paid";
+}
+
+/** Every model of Your AIs, as candidates for a site. Agents are never started: only models already seen. */
+export async function yourAiModels(defaultAgent: string, siteAgents: string[]): Promise<Array<Candidate & { name: string }>> {
+	const found: Array<Candidate & { name: string }> = [];
+	for (const id of yourAis(defaultAgent, siteAgents)) {
+		const isDefault = id === defaultAgent;
+		const llm = parseLlmId(id);
+		if (!llm) {
+			const models = seenAgentModels(id);
+			if (!models) found.push({ agent: id, name: agentName(id), traits: traitsOf({ kind: "agent" }, { name: agentName(id) }), isDefault });
+			for (const m of models?.options ?? []) {
+				found.push({ agent: id, model: m.id, name: m.name, traits: traitsOf({ kind: "agent" }, m), isDefault, isCurrent: m.id === models?.current });
+			}
+			continue;
+		}
+		const provider = getProvider(llm.providerId);
+		if (!provider) continue;
+		const models = await listModels(provider).catch(() => []);
+		const current = llm.model ? undefined : loadConfig().models?.[id];
+		for (const m of models.filter((m) => !llm.model || m.id === llm.model)) {
+			const kind = { kind: "llm" as const, local: provider.kind !== "openai" && !m.remote, plan: Boolean(m.remote) };
+			const traits = traitsOf(kind, { name: m.id.split("/").pop() ?? m.id, meta: m.meta, loaded: m.loaded });
+			// A fixed-model AI has no choice to make: the AI is the model.
+			found.push({ agent: id, ...(llm.model ? {} : { model: m.id }), name: m.id.split("/").pop() ?? m.id, traits, isDefault, isCurrent: m.id === current });
+		}
+	}
+	return found;
+}
+
+/** Candidates a dynamic site may use: those costing no more than `upTo`. */
+export function withinCeiling<C extends Candidate>(candidates: C[], upTo: Cost): C[] {
+	return candidates.filter((c) => COST[c.traits.cost] <= COST[upTo]);
+}
+
+const CEILING_WORDS: Record<Cost, string> = { free: "on this computer", plan: "on this computer or your plans", paid: "" };
+
+/**
+ * The AI and model a site uses, launched: its own choices, the default AI,
+ * or, on dynamic selection, the cheapest of Your AIs that fits it right now.
+ */
+export async function resolveSiteAi(grant: Grant | undefined, defaultAgent: string, siteAgents: () => string[]): Promise<AgentLaunch & { name: string }> {
+	if (!grant?.agent || !isDynamic(grant.agent)) return resolveSiteAgent(grant, defaultAgent);
+	const upTo = dynamicCeiling(grant.agent);
+	const best = recommend(grant.needs, withinCeiling(await yourAiModels(defaultAgent, siteAgents()), upTo));
+	if (!best) throw new Error(`None of your AIs ${CEILING_WORDS[upTo] || "available"} fits this site. Choose one for it in Leuria.`);
+	return resolveAgentCommand(best.agent, best.model);
+}
+
+/** "Dynamic selection", for a site on it; the AI's label otherwise. */
+export function siteAiLabel(grant: Grant | undefined, defaultAgent: string, label: (id: string, model?: string) => string): string {
+	if (grant?.agent && isDynamic(grant.agent)) return "Dynamic selection";
+	const id = grant?.agent ?? defaultAgent;
+	return label(id, grant?.model?.agent === id ? grant.model.id : loadConfig().models?.[id]);
 }

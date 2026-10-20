@@ -2,9 +2,9 @@
 import { spawn } from "node:child_process";
 import { parseArgs } from "node:util";
 
-import { agentName, listAgents, pruneAgentVersions, resolveAgentCommand, resolveSiteAgent, updateAgents } from "./agents.js";
+import { agentName, listAgents, pruneAgentVersions, resolveAgentCommand, updateAgents } from "./agents.js";
 import { createAdminHandler } from "./admin.js";
-import { convertServiceAis } from "./ais.js";
+import { convertServiceAis, resolveSiteAi, siteAiLabel } from "./ais.js";
 import { aiLabel, checkSignIn, rememberAgentState, signIn } from "./auth.js";
 import { agentId, detectInstalledClis } from "./detect.js";
 import { detectLlms, listModels, llmId, removeProvider, saveProvider } from "./llm/providers.js";
@@ -274,7 +274,7 @@ async function start(config: EngineConfig, verbose: boolean): Promise<void> {
 			grants,
 			logger,
 			agentName: agentName(config.agent),
-			resolveAgent: (origin) => resolveSiteAgent(grants.get(origin), config.agent),
+			resolveAgent: (origin) => resolveSiteAi(grants.get(origin), config.agent, () => grants.list().flatMap((g) => (g.agent ? [g.agent] : []))),
 			onAgentState: rememberAgentState,
 			stdioMcpCommand,
 			// No app to ask in: the engine's own approval page, in the browser.
@@ -361,12 +361,8 @@ async function startForApp(config: EngineConfig, verbose: boolean, devPairing: b
 		grants,
 		logger,
 		agentName: () => agentName(config.agent),
-		resolveAgent: (origin) => resolveSiteAgent(grants.get(origin), config.agent),
-		siteAgentName: (origin) => {
-			const grant = grants.get(origin);
-			const id = grant?.agent ?? config.agent;
-			return aiLabel(id, grant?.model?.agent === id ? grant.model.id : loadConfig().models?.[id]);
-		},
+		resolveAgent: (origin) => resolveSiteAi(grants.get(origin), config.agent, () => grants.list().flatMap((g) => (g.agent ? [g.agent] : []))),
+		siteAgentName: (origin) => siteAiLabel(grants.get(origin), config.agent, aiLabel),
 		// A real session is the check: remember it, and tell the app when an AI is signed out.
 		onAgentState: (id, state) => {
 			rememberAgentState(id, state);

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { AgentModelSelect } from "../components/AgentModelSelect";
 import { AiChoiceCard } from "../components/AiChoiceCard";
+import { CeilingSelect, DYNAMIC, DYNAMIC_WORDS, dynamicId, dynamicTitle, isDynamic } from "../components/DynamicSelection";
 import { costWords, needsSentence, verdictOf, verdictWords } from "../fit-words";
 import { Disclosure } from "../components/Disclosure";
 import { SiteSkills } from "../components/SiteSkills";
@@ -249,8 +250,9 @@ function SiteRow({
 	const ownModel = site.model?.agent === siteAgent ? site.model.id : undefined;
 	const aiChoice = models?.options.find((m) => m.id === models.current)?.name;
 	// The folded line says what the site uses: "Uses the default", "Uses Claude · Sonnet 5".
+	const dynamic = isDynamic(site.agent);
 	const ownAi = site.agent && site.agent !== status.agent.id ? ais.find((a) => a.id === site.agent) : undefined;
-	const usesAi = ownAi ? friendlyName(ownAi) : "the default";
+	const usesAi = dynamic ? DYNAMIC_WORDS.toLowerCase() : ownAi ? friendlyName(ownAi) : "the default";
 	const ownModelName = ownModel ? (models?.options.find((m) => m.id === ownModel)?.name ?? ownModel) : undefined;
 	const siteName = site.app ?? new URL(site.origin).host;
 	// Decisions: the site follows the choice every site gets, or has its own (a model here, off, or a service set from the engine).
@@ -259,12 +261,13 @@ function SiteRow({
 	// What answers this site, what it costs, and how it fits what the site said it needs.
 	const current = ownModel ?? models?.current;
 	const currentName = models?.options.find((m) => m.id === current)?.name;
-	const currentAiName = ownAi ? friendlyName(ownAi) : friendlyName(status.agent);
+	const currentAiName = dynamic ? DYNAMIC_WORDS : ownAi ? friendlyName(ownAi) : friendlyName(status.agent);
 	const fitAi = fit?.ais.find((a) => a.id === siteAgent);
-	const currentCost = fitAi?.models.find((m) => m.id === current)?.cost ?? fitAi?.cost;
+	// On dynamic selection, what the site would get right now is the recommendation within its ceiling.
+	const currentCost = dynamic ? fit?.recommended?.cost : (fitAi?.models.find((m) => m.id === current)?.cost ?? fitAi?.cost);
 	const declared = Boolean(fit?.needs);
-	const currentVerdict = declared ? verdictOf(fit, siteAgent, current) : undefined;
-	const best = declared ? (fit?.recommended ?? null) : null;
+	const currentVerdict = declared && !dynamic ? verdictOf(fit, siteAgent, current) : undefined;
+	const best = declared && !dynamic ? (fit?.recommended ?? null) : null;
 	const bestAi = best ? ais.find((a) => a.id === best.agent) : undefined;
 	const onBest = best !== null && best.agent === siteAgent && (best.model === null || best.model === current);
 	const row = useRef<HTMLDivElement>(null);
@@ -313,7 +316,7 @@ function SiteRow({
 						onOpen={() => void homeStore.loadFit(site.origin)}
 					>
 						<AiChoiceCard
-							title={currentName ? `${currentAiName} · ${currentName}` : currentAiName}
+							title={dynamic ? dynamicTitle(fit, ais) : currentName ? ` · ` : currentAiName}
 							cost={costWords(currentCost, currentAiName)}
 							verdict={currentVerdict}
 							needs={needsSentence(site.needs)}
@@ -336,9 +339,9 @@ function SiteRow({
 									AI
 								</Text>
 								<Select.Root
-									value={site.agent && site.agent !== status.agent.id ? site.agent : DEFAULT}
+									value={dynamic ? DYNAMIC : site.agent && site.agent !== status.agent.id ? site.agent : DEFAULT}
 									disabled={busy}
-									onValueChange={(value) => void homeStore.setSiteAgent(site.origin, value === DEFAULT ? null : value)}
+									onValueChange={(value) => void homeStore.setSiteAgent(site.origin, value === DEFAULT ? null : value === DYNAMIC ? dynamicId("plan") : value)}
 								>
 									<Select.Trigger aria-label={`AI for ${site.origin}`} style={{ width: "100%" }} />
 									<Select.Content position="popper">
@@ -353,9 +356,16 @@ function SiteRow({
 												{verdictWords(verdictOf(fit, agent.id))}
 											</Select.Item>
 										))}
+										{choices.length > 0 && (
+											<>
+												<Select.Separator />
+												<Select.Item value={DYNAMIC}>{DYNAMIC_WORDS}</Select.Item>
+											</>
+										)}
 									</Select.Content>
 								</Select.Root>
 							</Flex>
+							{dynamic && site.agent && <CeilingSelect id={site.agent} host={siteName} disabled={busy} onChange={(id) => void homeStore.setSiteAgent(site.origin, id)} />}
 							{(site.needs?.decide || site.decide !== undefined || (decisions?.models.length ?? 0) > 0) && (
 								<Flex direction="column" gap="1">
 									<Text as="label" size="2" weight="medium">

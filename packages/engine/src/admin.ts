@@ -37,12 +37,12 @@ import type * as http from "node:http";
 
 import { agentName, ensureAgent, isAvailable, listAgents, resetAgent } from "./agents.js";
 import { detectLlms, getProvider, isLlmId, listModels, llmId, normalizeBaseUrl, parseLlmId, removeProvider, saveProvider } from "./llm/providers.js";
-import { agentModels, checkSignIn, seenAgentModels, signIn } from "./auth.js";
-import { type Candidate, fitOf, reasonFor, recommend, traitsOf, type Verdict } from "./fit.js";
+import { agentModels, checkSignIn, signIn } from "./auth.js";
+import { type Cost, fitOf, reasonFor, recommend, type Verdict } from "./fit.js";
 import { parseNeeds, type SiteNeeds } from "./needs.js";
 import { detectInstalledClis } from "./detect.js";
 import type { GrantStore } from "./grants.js";
-import { addAi, providerInUse, removeAi, yourAis } from "./ais.js";
+import { addAi, dynamicCeiling, isDynamic, providerInUse, removeAi, withinCeiling, yourAiModels, yourAis } from "./ais.js";
 import { type DecideChoice, type EmbedChoice, type EngineConfig, isKnownReady, loadConfig, saveConfig } from "./home.js";
 import { askSystemOne, decisionBaseUrl, DEFAULT_DECISION_URL, listLocalDeciders, probeService, systemOneDecisions } from "./llm/decisions.js";
 import { listLocalEmbedders, localEmbeddings } from "./llm/embeddings.js";
@@ -352,10 +352,10 @@ export function createAdminHandler(ctx: AdminContext) {
 				return true;
 			}
 			const agent = typeof body.agent === "string" && body.agent && body.agent !== ctx.config.agent ? body.agent : undefined;
-			if (agent && !isLlmId(agent)) await ensureAgent(agent, { onProgress: (message) => ctx.emit({ event: "progress", stage: "install", message }) });
+			if (agent && !isLlmId(agent) && !isDynamic(agent)) await ensureAgent(agent, { onProgress: (message) => ctx.emit({ event: "progress", stage: "install", message }) });
 			ctx.grants.setAgent(body.origin, agent);
-			if (agent) addAi(agent);
-			const signIn = agent ? await checkSignIn(agent) : { ok: true, detail: "default AI", methods: [] };
+			if (agent && !isDynamic(agent)) addAi(agent);
+			const signIn = agent && !isDynamic(agent) ? await checkSignIn(agent) : { ok: true, detail: "default AI", methods: [] };
 			sendJson(res, 200, { origin: body.origin, agent: agent ?? null, signIn });
 			return true;
 		}
@@ -370,9 +370,12 @@ export function createAdminHandler(ctx: AdminContext) {
 		}
 		if (route === "POST /fit") {
 			// A site's needs: given (a request being approved), or the ones it declared (a connected site).
-			const body = (await parseBody(req)) as { needs?: unknown; origin?: unknown };
-			const needs = parseNeeds(body.needs) ?? (typeof body.origin === "string" ? ctx.grants.get(body.origin)?.needs : undefined);
-			sendJson(res, 200, await fitAis(ctx, needs));
+			const body = (await parseBody(req)) as { needs?: unknown; origin?: unknown; upTo?: unknown };
+			const grant = typeof body.origin === "string" ? ctx.grants.get(body.origin) : undefined;
+			const needs = parseNeeds(body.needs) ?? grant?.needs;
+			// `upTo` for a dynamic choice being made; a connected dynamic site has its own.
+			const upTo = body.upTo === "free" || body.upTo === "plan" || body.upTo === "paid" ? body.upTo : grant?.agent && isDynamic(grant.agent) ? dynamicCeiling(grant.agent) : undefined;
+			sendJson(res, 200, await fitAis(ctx, needs, upTo));
 			return true;
 		}
 		if (route === "POST /pairing/link") {
@@ -507,39 +510,21 @@ export function createAdminHandler(ctx: AdminContext) {
 	};
 }
 
-/** Every model of Your AIs, as candidates for a site. Agents are never started: only models already seen. */
-async function candidates(ctx: AdminContext): Promise<Array<Candidate & { name: string }>> {
-	const siteAgents = ctx.grants.list().flatMap((g) => (g.agent ? [g.agent] : []));
-	const found: Array<Candidate & { name: string }> = [];
-	for (const id of yourAis(ctx.config.agent, siteAgents)) {
-		const isDefault = id === ctx.config.agent;
-		const llm = parseLlmId(id);
-		if (!llm) {
-			const models = seenAgentModels(id);
-			if (!models) found.push({ agent: id, name: agentName(id), traits: traitsOf({ kind: "agent" }, { name: agentName(id) }), isDefault });
-			for (const m of models?.options ?? []) {
-				found.push({ agent: id, model: m.id, name: m.name, traits: traitsOf({ kind: "agent" }, m), isDefault, isCurrent: m.id === models?.current });
-			}
-			continue;
-		}
-		const provider = getProvider(llm.providerId);
-		if (!provider) continue;
-		const models = await listModels(provider).catch(() => []);
-		const current = llm.model ? undefined : loadConfig().models?.[id];
-		for (const m of models.filter((m) => !llm.model || m.id === llm.model)) {
-			const kind = { kind: "llm" as const, local: provider.kind !== "openai" && !m.remote, plan: Boolean(m.remote) };
-			const traits = traitsOf(kind, { name: m.id.split("/").pop() ?? m.id, meta: m.meta, loaded: m.loaded });
-			// A fixed-model AI has no choice to make: the AI is the model.
-			found.push({ agent: id, ...(llm.model ? {} : { model: m.id }), name: m.id.split("/").pop() ?? m.id, traits, isDefault, isCurrent: m.id === current });
-		}
-	}
-	return found;
+/** Every model of Your AIs, as candidates for a site. */
+function candidates(ctx: AdminContext) {
+	return yourAiModels(ctx.config.agent, siteAgents(ctx));
+}
+
+/** The AIs sites use (set up before Your AIs existed, or since). */
+function siteAgents(ctx: AdminContext): string[] {
+	return ctx.grants.list().flatMap((g) => (g.agent ? [g.agent] : []));
 }
 
 /** How Your AIs fit `needs`: a verdict per AI and model, and the cheapest that is enough. */
-async function fitAis(ctx: AdminContext, needs: SiteNeeds | undefined) {
+async function fitAis(ctx: AdminContext, needs: SiteNeeds | undefined, upTo?: Cost) {
 	const all = await candidates(ctx);
-	const best = recommend(needs, all);
+	// On dynamic selection, the recommendation is what the site would get now: within its ceiling.
+	const best = recommend(needs, upTo ? withinCeiling(all, upTo) : all);
 	const order: Verdict[] = ["fits", "more", "short"];
 	const ais = [...new Set(all.map((c) => c.agent))].map((id) => {
 		const own = all.filter((c) => c.agent === id);

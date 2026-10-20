@@ -190,6 +190,8 @@ export const homeStore = createStore(initial, {
 		if (abandoned && abandoned !== agent && !isDefault) await engine.resetAgent(abandoned).catch(() => undefined);
 		try {
 			const result = await engine.setSiteAgent(origin, agent);
+			// What the site gets changed: on dynamic selection, so does what it would get right now.
+			void homeStore.loadFit(origin);
 			return {
 				settingUp: null,
 				sites: await engine.sites(),

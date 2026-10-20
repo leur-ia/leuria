@@ -4,6 +4,7 @@ import { useStore } from "@sinuxjs/react";
 import { useEffect, useState } from "react";
 
 import { AiChoiceCard } from "../components/AiChoiceCard";
+import { CeilingSelect, DYNAMIC, DYNAMIC_WORDS, dynamicId, dynamicTitle, isDynamic } from "../components/DynamicSelection";
 import { SiteSkills } from "../components/SiteSkills";
 import { friendlyName, type PairingRequest, type Status } from "../engine";
 import { costWords, needsSentence, verdictOf, verdictWords } from "../fit-words";
@@ -30,8 +31,9 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 	useEffect(() => void pairingStore.open(request.requestId, request.needs), [request.requestId]);
 
 	const others = choice.ais.filter((ai) => !ai.default);
+	const dynamic = isDynamic(choice.agent);
 	const picked = choice.agent ? choice.ais.find((ai) => ai.id === choice.agent) : undefined;
-	const aiName = picked ? friendlyName(picked) : agent ? friendlyName(agent) : "your AI";
+	const aiName = dynamic ? DYNAMIC_WORDS : picked ? friendlyName(picked) : agent ? friendlyName(agent) : "your AI";
 	const modelName = choice.model ? (choice.models?.options.find((m) => m.id === choice.model)?.name ?? choice.model) : undefined;
 	const sameModel = choice.models?.options.find((m) => m.id === choice.models?.current)?.name;
 
@@ -41,9 +43,10 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 	const current = choice.model ?? choice.models?.current;
 	const currentName = choice.models?.options.find((m) => m.id === current)?.name;
 	const fitAi = choice.fit?.ais.find((a) => a.id === agentId);
-	const currentCost = fitAi?.models.find((m) => m.id === current)?.cost ?? fitAi?.cost;
+	// On dynamic selection, what the site would get right now is the recommendation within its ceiling.
+	const currentCost = dynamic ? choice.fit?.recommended?.cost : (fitAi?.models.find((m) => m.id === current)?.cost ?? fitAi?.cost);
 	const declared = Boolean(choice.fit?.needs);
-	const best = declared ? (choice.fit?.recommended ?? null) : null;
+	const best = declared && !dynamic ? (choice.fit?.recommended ?? null) : null;
 	const bestAi = best ? choice.ais.find((ai) => ai.id === best.agent) : undefined;
 	const onBest = best !== null && best.agent === agentId && (best.model === null || best.model === current);
 
@@ -83,9 +86,9 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 						{request.app ?? host} wants to use your AI
 					</Dialog.Title>
 					<AiChoiceCard
-						title={currentName ? `${aiName} · ${currentName}` : aiName}
+						title={dynamic ? dynamicTitle(choice.fit, choice.ais) : currentName ? ` · ` : aiName}
 						cost={costWords(currentCost, aiName)}
-						verdict={declared ? verdictOf(choice.fit, agentId, current) : undefined}
+						verdict={declared && !dynamic ? verdictOf(choice.fit, agentId, current) : undefined}
 						needs={needsSentence(request.needs)}
 						busy={busy}
 						suggestion={
@@ -104,9 +107,9 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 									AI
 								</Text>
 								<Select.Root
-									value={choice.agent ?? DEFAULT}
+									value={dynamic ? DYNAMIC : (choice.agent ?? DEFAULT)}
 									disabled={busy}
-									onValueChange={(value) => void pairingStore.pick(value === DEFAULT ? null : value, null)}
+									onValueChange={(value) => void pairingStore.pick(value === DEFAULT ? null : value === DYNAMIC ? dynamicId("plan") : value, null)}
 								>
 									<Select.Trigger aria-label={`AI for ${host}`} style={{ width: "100%" }} />
 									<Select.Content position="popper">
@@ -121,10 +124,13 @@ export function PairingPrompt({ request, agent }: { request: PairingRequest; age
 												{verdictWords(verdictOf(choice.fit, ai.id))}
 											</Select.Item>
 										))}
+										<Select.Separator />
+										<Select.Item value={DYNAMIC}>{DYNAMIC_WORDS}</Select.Item>
 									</Select.Content>
 								</Select.Root>
 							</Flex>
 						)}
+						{dynamic && choice.agent && <CeilingSelect id={choice.agent} host={host} disabled={busy} onChange={(id) => void pairingStore.pick(id, null)} />}
 						{choice.models && choice.models.options.length > 1 && (
 							<Flex direction="column" gap="1">
 								<Text as="label" size="2" weight="medium">
