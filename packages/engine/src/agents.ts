@@ -105,16 +105,16 @@ function installedIds(): string[] {
 }
 
 /**
- * Keep only the newest version of each installed agent. Call it before any
- * session starts: an older version may be running otherwise.
+ * Keep only the `keep` newest versions of each installed agent. With 1, call
+ * it before any session starts: an older version may be running otherwise.
  */
-export function pruneAgentVersions(): void {
+export function pruneAgentVersions(keep = 1): void {
 	const root = agentsDir();
 	for (const id of installedIds()) {
 		const versions = readdirSync(root)
 			.filter((name) => name.startsWith(`${id}@`) && existsSync(join(root, name, MANIFEST)))
 			.sort(compareVersions);
-		for (const old of versions.slice(0, -1)) rmSync(join(root, old), { recursive: true, force: true });
+		for (const old of versions.slice(0, -keep)) rmSync(join(root, old), { recursive: true, force: true });
 	}
 }
 
@@ -131,6 +131,8 @@ export async function updateAgents(onUpdated?: (agent: InstalledAgent, from: str
 		if (!installed || !entry || !runnableHere(entry) || compareVersions(entry.version, installed.version) <= 0) continue;
 		try {
 			const agent = await ensureAgent(id, { update: true });
+			// Running sessions may still use the replaced version; anything older is unused.
+			pruneAgentVersions(2);
 			await onUpdated?.(agent, installed.version);
 		} catch {
 			// Offline, or the install failed: the current version keeps working.

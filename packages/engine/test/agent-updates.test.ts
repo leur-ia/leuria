@@ -45,6 +45,14 @@ describe("keeping installed AIs up to date", () => {
 		expect(installedAgent("claude-acp")?.version).toBe("0.84.0");
 	});
 
+	it("keeps the replaced version too right after an update, for sessions still running it", () => {
+		fakeInstall(home, "claude-acp", "0.9.0");
+		fakeInstall(home, "claude-acp", "0.81.2");
+		fakeInstall(home, "claude-acp", "0.84.0");
+		pruneAgentVersions(2);
+		expect(readdirSync(join(home, "agents")).sort()).toEqual(["claude-acp@0.81.2", "claude-acp@0.84.0"]);
+	});
+
 	it("leaves an AI alone when the registry has nothing newer, or doesn't list it", async () => {
 		fakeInstall(home, "claude-acp", "0.84.0");
 		fakeInstall(home, "private-agent", "1.0.0");
